@@ -1,0 +1,77 @@
+START BDT ranking of type: std-nopct-2tag3jet-0_150ptv_tF
+>-----------------------------------EVENT COUNTS-----------------------------------------------<
+             ZHll125            TOTAL_BG            t#bar{t}                  Zl                  Zc                  Zb
+             4.99471             2782.34             773.646             56.4753             253.913             1660.56
+>----------------------------------------------------------------------------------------------<
+RANKED VARIABLES: mBB dRBB 
+UNRANKED VARIABLES: pTJ3 dEtaBB pTV dPhiVBB dEtaVBB mLL MET pTB1 pTB2 
+Significance starts at 0.30287
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, + :
+              dEtaBB                pTJ3             dPhiVBB                 pTV                pTB1             dEtaVBB                pTB2                 mLL                 MET
+            0.288635             0.29682             0.29943             0.30019            0.304305            0.305001            0.309664            0.311832              0.3283
+
+Maximum is (MET,0.3283)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, MET, + :
+                 mLL                pTJ3                pTB1             dPhiVBB             dEtaVBB                 pTV                pTB2              dEtaBB
+            0.331997            0.337681            0.351384            0.357882            0.360362            0.369554             0.37541            0.405289
+
+Maximum is (dEtaBB,0.40529)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, MET, dEtaBB, + :
+                pTB1                pTB2                 pTV             dPhiVBB                pTJ3                 mLL             dEtaVBB
+            0.382045            0.384752            0.397259            0.401175            0.410399            0.419969            0.431855
+
+Maximum is (dEtaVBB,0.43185)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, MET, dEtaBB, dEtaVBB, + :
+                pTJ3             dPhiVBB                pTB1                 pTV                 mLL                pTB2
+             0.41715            0.420875            0.422001            0.425354            0.440149            0.442051
+
+Maximum is (pTB2,0.44205)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, MET, dEtaBB, dEtaVBB, pTB2, + :
+                pTB1                 pTV             dPhiVBB                pTJ3                 mLL
+            0.427227            0.429195            0.430276             0.43687            0.459189
+
+Maximum is (mLL,0.45919)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, MET, dEtaBB, dEtaVBB, pTB2, mLL, + :
+                pTJ3             dPhiVBB                 pTV                pTB1
+            0.419021            0.449908            0.452337            0.456674
+
+Maximum is (pTB1,0.45667)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, MET, dEtaBB, dEtaVBB, pTB2, mLL, pTB1, + :
+                pTJ3             dPhiVBB                 pTV
+              0.4438            0.450223            0.454049
+
+Maximum is (pTV,0.45405)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, MET, dEtaBB, dEtaVBB, pTB2, mLL, pTB1, pTV, + :
+                pTJ3             dPhiVBB
+            0.455578            0.464363
+
+Maximum is (dPhiVBB,0.46436)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, MET, dEtaBB, dEtaVBB, pTB2, mLL, pTB1, pTV, dPhiVBB, + :
+                pTJ3
+            0.454855
+
+Maximum is (pTJ3,0.45485)
+------------------------------------------------------------------------------------------------
+Ranking Complete.  The training path looks like:
+Began with: mBB dRBB , S/sqrt(S+B)=0.30287
+            VARIABLE |         S/sqrt(S+B)
+----------------------------
+                 MET |           0.3283
+              dEtaBB |          0.40529
+             dEtaVBB |          0.43185
+                pTB2 |          0.44205
+                 mLL |          0.45919
+                pTB1 |          0.45667
+                 pTV |          0.45405
+             dPhiVBB |          0.46436
+                pTJ3 |          0.45485
+DAISY_CHAIN: mBB dRBB MET dEtaBB dEtaVBB pTB2 mLL pTB1 pTV dPhiVBB pTJ3 

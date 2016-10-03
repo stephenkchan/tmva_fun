@@ -1,0 +1,34 @@
+#include "li_plotter.h"
+
+li_plotter::li_plotter(const string&in,const string&out,bool lptv,int nj):li_ranking(in,out,lptv,nj){}
+
+vector<TString> li_plotter::all_plots(const TString&pdir,bool tF){
+  vector<TString>tmva_files,xls,yls={"combined"};vector<vector<double> >sigmtrx(cases().size(),vector<double>(jets().size()*ptvs().size()+1,0.));
+  for(auto whic:cases())xls.push_back(var_tag(whic));
+  for(int i=0;i<(int)jets().size();i++){
+    for(int j=0;j<(int)ptvs().size();j++){
+      for(int k=0;k<(int)cases().size();k++){
+	pair<TString,double> wompa=single_plots(cases()[k],jets()[i],ptvs()[j],pdir,tF);
+	tmva_files.push_back(wompa.first);sigmtrx[k][i*ptvs().size()+j+1]=wompa.second;sigmtrx[k][0]+=wompa.second*wompa.second;
+	cout<<jets()[i]<<" jet, "<<(ptvs()[j]?"LO":"HI")<<" pTV, "<<var_tag(cases()[k])<<", sigmtrx["<<k<<"]["<<i*ptvs().size()+j+1<<"]="<<wompa.second<<"; sigmtrx["<<k<<"][0]="<<sigmtrx[k][0]<<endl;
+      }
+      yls.push_back(region_label());
+    }
+  }
+  for(int k=0;k<(int)cases().size();k++)sigmtrx[k][0]=sqrt(sigmtrx[k][0]);
+  print_info_plot_2d(sigmtrx,xls,yls,"li_sig_mtrx",pdir,"LI S/#sqrt{S+B} Summary");
+  return tmva_files;
+}
+
+pair<TString,double> li_plotter::single_plots(int whic,int nj,bool lpt,const TString&pdir,bool tF){
+  TStyle *style=set_style();style->cd();set_pars(whic,nj,lpt);
+  TCanvas *c=new TCanvas(pdir+tag(),pdir+tag(),500,300);
+  if(opendir(pdir.Data())==NULL)system(("mkdir -p "+string(pdir.Data())).c_str());
+  if(!file_exists(var_log(tF)))single_rank(whic,nj,lpt);
+  vector<TString>vars=print_training_plot(c,tag(),pdir,tF);
+  double sig=0.;vector<int>bgs{-1};//{1,2,
+  for(auto i:bgs)sig=bdt_testing(tmva_in_dir,tmva_out_dir,tag()+(tF?"_tF":""),vars).print_test_bdts(c,pdir,i,tF).second;
+  delete c;
+  return {bdt_trainer(tmva_in_dir,tmva_out_dir,var_tag(which),vars).filename(),sig};
+}
+

@@ -1,0 +1,22 @@
+#include "bdt_trainer.h"
+#include "bdt_testing.h"
+#include "bdt_validate.h"
+#include "bdt_ranker.h"
+
+int main(){
+  string in="/n/atlasfs/atlasdata/atlasdata1/stchan/vhbb/tmva-data/20160405_srli/",out="/n/atlasfs/atlasdata/atlasdata1/stchan/vhbb/tmva-data/20160405_srli/output/";
+  bdt_ranker surge(in,out,{"j0_j1","angle_j0_j1"},{"l0_l1","angle_inv_lb0","j0_l0"});
+  TCanvas*c=new TCanvas("derp","derp",500,300);
+//   surge.finish_ranking("blarg",false,2);  surge.print_training_plot(c,"blarg",".",2);
+//   return 0;
+  vector<TString>vars={"mBB","dRBB","dPhiVBB","MV2c20B1","pTB2","MET","dEtaVBB","MV2c20B2","mLL","dEtaBB","pTB1","pTV"};
+  // bdt_base pikachu(in,out,"blarg",2,-99,85,20,false,7);
+  bdt_base pikachu(in,out,"blarg",2,2,77,20,false,0);
+//   TCanvas*c=new TCanvas("derp","derp",500,300);
+//   cout<<"TRAIN "<<pikachu.significance(true).second<<endl;
+  bdt_validate pichu(vars,false,pikachu);//,string("cut"),vars);
+//   cout<<"VAL "<<pichu.val_sig(-1,false).second<<endl;
+  pichu.print_validation_bdts(c,".",-1);
+  for(auto i:{2,4,5,6})bdt_testing(vars,false,pikachu).print_test_bdts(c,".",i,false);
+  return 0;
+}

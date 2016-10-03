@@ -1,0 +1,70 @@
+START BDT ranking of type: std-nopct-2tag2jet-150ptv_tF
+>-----------------------------------EVENT COUNTS-----------------------------------------------<
+             ZHll125            TOTAL_BG            t#bar{t}                  Zl                  Zc                  Zb
+             1.02518             75.6154             4.74022             1.58021             6.24174             60.1263
+>----------------------------------------------------------------------------------------------<
+RANKED VARIABLES: mBB dRBB 
+UNRANKED VARIABLES: dEtaBB pTV dPhiVBB dEtaVBB mLL MET pTB1 pTB2 
+Significance starts at 0.59814
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, + :
+                 pTV             dEtaVBB                pTB2              dEtaBB                 MET                 mLL                pTB1             dPhiVBB
+            0.530472              0.5537            0.611669            0.637419            0.657141            0.679809            0.691284            0.692145
+
+Maximum is (dPhiVBB,0.69215)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dPhiVBB, + :
+             dEtaVBB                 mLL                 pTV              dEtaBB                 MET                pTB1                pTB2
+            0.582422            0.593479            0.692862            0.695046            0.698326            0.729188            0.729637
+
+Maximum is (pTB2,0.72964)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dPhiVBB, pTB2, + :
+              dEtaBB                 mLL                 pTV                 MET             dEtaVBB                pTB1
+            0.671615            0.688862            0.700996            0.701705            0.709727            0.738849
+
+Maximum is (pTB1,0.73885)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dPhiVBB, pTB2, pTB1, + :
+              dEtaBB                 pTV                 mLL             dEtaVBB                 MET
+            0.653796            0.673034            0.693108            0.699525            0.701714
+
+Maximum is (MET,0.70171)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dPhiVBB, pTB2, pTB1, MET, + :
+              dEtaBB                 mLL                 pTV             dEtaVBB
+            0.642172            0.655757            0.658509            0.697481
+
+Maximum is (dEtaVBB,0.69748)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dPhiVBB, pTB2, pTB1, MET, dEtaVBB, + :
+                 pTV              dEtaBB                 mLL
+            0.652317            0.671213            0.694007
+
+Maximum is (mLL,0.69401)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dPhiVBB, pTB2, pTB1, MET, dEtaVBB, mLL, + :
+                 pTV              dEtaBB
+            0.622402            0.668536
+
+Maximum is (dEtaBB,0.66854)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dPhiVBB, pTB2, pTB1, MET, dEtaVBB, mLL, dEtaBB, + :
+                 pTV
+             0.58805
+
+Maximum is (pTV,0.58805)
+------------------------------------------------------------------------------------------------
+Ranking Complete.  The training path looks like:
+Began with: mBB dRBB , S/sqrt(S+B)=0.59814
+            VARIABLE |         S/sqrt(S+B)
+----------------------------
+             dPhiVBB |          0.69215
+                pTB2 |          0.72964
+                pTB1 |          0.73885
+                 MET |          0.70171
+             dEtaVBB |          0.69748
+                 mLL |          0.69401
+              dEtaBB |          0.66854
+                 pTV |          0.58805
+DAISY_CHAIN: mBB dRBB dPhiVBB pTB2 pTB1 MET dEtaVBB mLL dEtaBB pTV 

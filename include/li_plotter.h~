@@ -1,0 +1,31 @@
+#ifndef LI_PLOTTER_H
+#define LI_PLOTTER_H
+
+#include "li_ranking.h"
+#include "bdt_validate.h"
+#include "correlations.h"
+
+class li_plotter: public li_ranking{
+ public:
+  li_plotter(const string&in,const string&out);
+  void all_plots(const TString&pdir);
+  void single_plots(int which,const TString&pdir);
+
+ protected:
+  int color(int which)const;
+  void print_bdt_plots(TCanvas *c,const vector<TString>&vs,int bg,int which,const TString&pdir)const;
+  vector<TString> print_training_plot(TCanvas *c,int which,const TString&pdir)const;
+  string var_log(int which)const{return log(var_tag(which));}
+  bool file_exists(const string&name)const;
+  vector<float> line_to_floats(const string&line)const;
+  vector<string> line_to_words(const string&line)const;
+  TStyle* set_style()const;
+  TLatex plot_latex()const;
+  void auto_limits(vector<TH1D*> loki,double zero=0.)const;
+
+
+  int n_li_cases()const{return 6;}
+  int n_std_min()const{return -1;}
+};
+
+#endif

@@ -1,0 +1,14 @@
+About to execute (script /n/atlasfs/atlascode/backedup/stchan/vhbb/tmva_fun/scripts/finish_std-nopct-2jet-lopTV_tF.sh) finish_li /n/atlasfs/atlasdata/atlasdata1/stchan/vhbb/tmva-data/20160510/eff_77/ /n/atlasfs/atlasdata/atlasdata1/stchan/vhbb/tmva-data/20160510/eff_77/output/ -1 2 1 0 0 1 
+
+Begin training for type: std-nopct-2tag2jet-0_150ptv
+MAX found MET 0.49653
+MAX found dEtaBB 0.63335
+MAX found pTV 0.6613
+MAX found dEtaVBB 0.67605
+MAX found pTB2 0.68304
+MAX found dPhiVBB 0.6816
+MAX found pTB1 0.67018
+MAX found mLL 0.57994
+Ranking complete; no finishing necessary!  Will check kfold files...
+Info in <TCanvas::Print>: pdf file /n/atlasfs/atlasdata/atlasdata1/stchan/vhbb/tmva-data/20160510/eff_77/output/bdt_dist-val-std-nopct-2tag2jet-0_150ptv_tF_k-fold-even-all.pdf has been created
+Info in <TCanvas::Print>: pdf file /n/atlasfs/atlasdata/atlasdata1/stchan/vhbb/tmva-data/20160510/eff_77/output/bdt_dist-val-std-nopct-2tag2jet-0_150ptv_tF_k-fold-odd-all.pdf has been created

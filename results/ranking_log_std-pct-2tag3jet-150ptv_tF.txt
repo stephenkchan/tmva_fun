@@ -1,0 +1,97 @@
+START BDT ranking of type: std-pct-2tag3jet-150ptv_tF
+>-----------------------------------EVENT COUNTS-----------------------------------------------<
+             ZHll125            TOTAL_BG            t#bar{t}                  Zl                  Zc                  Zb
+             1.62348             290.933             23.4782             8.80752             34.3792             217.396
+>----------------------------------------------------------------------------------------------<
+RANKED VARIABLES: mBB dRBB 
+UNRANKED VARIABLES: MV2c20binB1 MV2c20binB2 MV2c20binJ3 pTJ3 dEtaBB pTV dPhiVBB dEtaVBB mLL MET pTB1 pTB2 
+Significance starts at 0.40139
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, + :
+                 mLL         MV2c20binB2         MV2c20binB1                pTJ3                pTB1                 pTV                 MET             dPhiVBB                pTB2              dEtaBB         MV2c20binJ3             dEtaVBB
+            0.398685            0.398855            0.398875            0.400393             0.45178            0.460107            0.464046            0.467652            0.479968             0.48439            0.488429            0.494353
+
+Maximum is (dEtaVBB,0.49435)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dEtaVBB, + :
+              dEtaBB             dPhiVBB                 mLL                pTB2                 MET                pTB1                pTJ3         MV2c20binB1                 pTV         MV2c20binB2         MV2c20binJ3
+            0.468381            0.474912            0.475051            0.485015            0.500378            0.500497            0.502942             0.50369            0.504353            0.505377            0.508001
+
+Maximum is (MV2c20binJ3,0.508)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dEtaVBB, MV2c20binJ3, + :
+                pTJ3             dPhiVBB                 mLL                 pTV         MV2c20binB1                pTB2         MV2c20binB2              dEtaBB                 MET                pTB1
+            0.427135            0.442716            0.475556            0.489304            0.494031             0.49867            0.500423            0.503544            0.510094            0.519371
+
+Maximum is (pTB1,0.51937)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dEtaVBB, MV2c20binJ3, pTB1, + :
+         MV2c20binB1                 mLL              dEtaBB                 MET                pTB2                 pTV             dPhiVBB         MV2c20binB2                pTJ3
+            0.438653            0.502196            0.503024            0.503702            0.504964            0.514254            0.523152            0.523827            0.534964
+
+Maximum is (pTJ3,0.53496)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dEtaVBB, MV2c20binJ3, pTB1, pTJ3, + :
+             dPhiVBB                 MET         MV2c20binB1                 pTV                 mLL                pTB2         MV2c20binB2              dEtaBB
+            0.460725            0.484838            0.485245            0.489647            0.511192            0.524972            0.530669            0.543467
+
+Maximum is (dEtaBB,0.543467)
+------------------------------------------------------------------------------------------------
+                 mLL             dPhiVBB                 MET                 pTV         MV2c20binB1                pTB2         MV2c20binB2
+            0.475456            0.479079            0.512475            0.519494            0.522313            0.540197            0.577217
+
+Maximum is (MV2c20binB2,0.577217)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dEtaVBB, MV2c20binJ3, pTB1, pTJ3, dEtaBB, MV2c20binB2, + :
+                 MET                 mLL             dPhiVBB                 pTV         MV2c20binB1                pTB2
+            0.494409            0.502188            0.507171            0.511078            0.522462            0.526338
+
+Maximum is (pTB2,0.526338)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dEtaVBB, MV2c20binJ3, pTB1, pTJ3, dEtaBB, MV2c20binB2, pTB2, + :
+                 mLL                 MET         MV2c20binB1                 pTV             dPhiVBB
+            0.500452            0.508481            0.516278            0.517494            0.519754
+
+Maximum is (dPhiVBB,0.519754)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dEtaVBB, MV2c20binJ3, pTB1, pTJ3, dEtaBB, MV2c20binB2, pTB2, dPhiVBB, + :
+         MV2c20binB1                 MET                 mLL                 pTV
+            0.479536            0.517536            0.519089            0.524936
+
+Maximum is (pTV,0.524936)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dEtaVBB, MV2c20binJ3, pTB1, pTJ3, dEtaBB, MV2c20binB2, pTB2, dPhiVBB, pTV, + :
+                 mLL         MV2c20binB1                 MET
+            0.515968            0.528728            0.539129
+
+Maximum is (MET,0.539129)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dEtaVBB, MV2c20binJ3, pTB1, pTJ3, dEtaBB, MV2c20binB2, pTB2, dPhiVBB, pTV, MET, + :
+                 mLL         MV2c20binB1
+            0.540851            0.547048
+
+Maximum is (MV2c20binB1,0.547048)
+------------------------------------------------------------------------------------------------
+Significances for mBB, dRBB, dEtaVBB, MV2c20binJ3, pTB1, pTJ3, dEtaBB, MV2c20binB2, pTB2, dPhiVBB, pTV, MET, MV2c20binB1, + :
+                 mLL
+            0.513301
+
+Maximum is (mLL,0.513301)
+------------------------------------------------------------------------------------------------
+Ranking Complete.  The training path looks like:
+Began with: mBB dRBB , S/sqrt(S+B)=0.40139
+            VARIABLE |         S/sqrt(S+B)
+----------------------------
+             dEtaVBB |          0.49435
+         MV2c20binJ3 |            0.508
+                pTB1 |          0.51937
+                pTJ3 |          0.53496
+              dEtaBB |         0.543467
+         MV2c20binB2 |         0.577217
+                pTB2 |         0.526338
+             dPhiVBB |         0.519754
+                 pTV |         0.524936
+                 MET |         0.539129
+         MV2c20binB1 |         0.547048
+                 mLL |         0.513301
+DAISY_CHAIN: mBB dRBB dEtaVBB MV2c20binJ3 pTB1 pTJ3 dEtaBB MV2c20binB2 pTB2 dPhiVBB pTV MET MV2c20binB1 mLL 

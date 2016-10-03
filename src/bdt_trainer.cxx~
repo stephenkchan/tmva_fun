@@ -1,0 +1,413 @@
+#include "bdt_trainer.h"
+
+bdt_trainer::bdt_trainer(const string&in,const string&out,const string&tag,const vector<TString>&vs,int nt,int nj,int eff_cut,int ratio,bool cts,bool lptv,bool wmll,bool met)
+  :tmva_in_dir(check_dir(in)),tmva_out_dir(check_dir(out)),identifier(tag),vars(vs),ntag(nt),njet(nj),beff_cut(eff_cut),charm_ratio(ratio),cts_mv2(cts),loptv(lptv),widemll(wmll),metcut(met){
+  debug=false;
+  if(opendir(tmva_in_dir.c_str())==NULL){
+    cout<<"TMVA data dir "<<tmva_in_dir<<" does not exist. Exiting..."<<endl;
+    exit(2);
+  }
+  if(opendir(tmva_out_dir.c_str())==NULL)system(("mkdir "+tmva_out_dir).c_str());
+  opfiles=vector<TFile*>();
+  //akt4EM FixedCutBEff_90,85,77,70,60,50,30 (numbers are nominal tag efficiencies)
+  btag_ratio_cuts={ {20,{{90,-0.9185}, {85,-0.7887}, {80,-0.5911}, {77,-0.4434}, {70,-0.0436}, {60,0.4496}, {50,0.7535}, {30,0.9540}}} };
+  def_cratio=btag_ratio_cuts.begin()->first;
+  if(btag_ratio_cuts.begin()->second.find(70)==btag_ratio_cuts.begin()->second.end()){
+    int dist=9999;
+    for(auto&cutpair:btag_ratio_cuts.begin()->second){
+      if(abs(70-cutpair.first)<dist)def_beff_cut=cutpair.first;
+    }
+  }
+  else def_beff_cut=70;
+  set_style()->cd();
+}
+bdt_trainer::~bdt_trainer(){
+  for(auto f:opfiles)f->Close();
+}
+pair<double,double> bdt_trainer::significance(bool overwrite){
+  pair<TH1D*,TH1D*>etendard=bdt_dists(overwrite),powerup=transformation_F(etendard);
+  if(debug)cerr<<"train std: "<<optimal_sig(etendard).second<<" t_F: "<<optimal_sig(powerup).second<<endl;
+  return optimal_sig(etendard);
+}
+
+pair<TH1D*,TH1D*> bdt_trainer::bdt_dists(bool overwrite){
+  DIR *zoom=opendir(tmva_out_dir.c_str());struct dirent *file;
+  if(vars.empty())return pair<TH1D*,TH1D*>(NULL,NULL);
+  bool file_found=false;string target(filename().Data()),wudder=target.substr(target.find("TMVA",target.find_last_of("/")));
+  while((file=readdir(zoom))!=NULL){
+    if(string(file->d_name)==wudder)file_found=true;
+  }
+  if(!file_found||overwrite)train();
+  TFile*f=TFile::Open(filename());opfiles.push_back(f);
+  TDirectoryFile*df=(TDirectoryFile*)f->Get("Method_BDT/BDT");
+  if(df==NULL)return pair<TH1D*,TH1D*>(NULL,NULL);
+  TH1D*sig=(TH1D*)df->Get("MVA_BDT_Train_S"),*big=(TH1D*)df->Get("MVA_BDT_Train_B");pair<double,double>sb(evts_S_B(-99));
+  double snorm=sb.first/sig->Integral(),bnorm=sb.second/big->Integral();
+  sig->Scale(snorm);big->Scale(bnorm);opfiles.push_back(f);
+//   if(debug)cerr<<"S events: "<<sig->Integral()<<" B events: "<<big->Integral()<<endl;
+  return pair<TH1D*,TH1D*>(sig,big);
+}
+
+pair<double,double> bdt_trainer::evts_S_B(int bg){
+  TFile*f=TFile::Open(filename());opfiles.push_back(f);
+  TH1D*events=(TH1D*)f->Get("events");
+  double sigev=events->GetBinContent(1),bigev=(is_single_bg(bg)?events->GetBinContent(bg+1):events->Integral(2,-1));
+  delete events;
+  return {sigev,bigev};
+}
+
+void bdt_trainer::train(int bg,bool do_validation)const{
+  TString outfileName=filename(bg);
+  TString mycuts = these_cuts();
+  if(do_validation) mycuts+=" && EventNumber%3!=0";//the last to set aside a third of events for validation
+
+  // This loads the library
+  TMVA::Tools::Instance();
+
+  // --- Here the preparation phase begins
+  std::vector<TFile*> openfiles;
+
+  // Create a ROOT output file where TMVA will store ntuples, histograms, etc.
+  TFile* outputFile = TFile::Open( outfileName, "RECREATE" );
+
+  TMVA::Factory *factory = new TMVA::Factory( "TMVAClassification"+ftag(), outputFile,"!V:Silent:Color:DrawProgressBar:AnalysisType=Classification" );
+  for(auto var:vars)factory->AddVariable(var,'F');
+
+  TH1D* events=new TH1D("events","events",n_sam(),-0.5,n_sam()-0.5);
+  
+  // global event weights per tree (see below for setting event-wise weights)
+  Double_t signalWeight     = 1.0, backgroundWeight = 1.0;
+  TSystemDirectory dir(tmva_in_dir.c_str(),tmva_in_dir.c_str());
+  TList* files = dir.GetListOfFiles(); TFile* inputFile;
+  pair<double,double>sbg;TString cut=these_cuts();
+  for (TObject* obj : *files) {
+    TString fileName = obj->GetName();
+    int sam=which_sam(fileName);
+    //if the sample number is less than zero, skip
+    if(!process_sample(bg,sam))continue;
+    fileName.Prepend(dir.GetName());
+    inputFile = TFile::Open(fileName);
+    openfiles.push_back(inputFile);
+    TTree* tree = (TTree*) inputFile->Get("Nominal");
+    if (tree==NULL)continue;
+    if (tree->GetEntries() == 0) continue;
+    double event=tree->Draw("EventWeight>>hist",cut);
+    TH1F *hist = (TH1F*)gDirectory->Get("hist");  event*=hist->GetMean();
+    events->Fill(sam,event);
+    if(sam)factory->AddBackgroundTree(tree, backgroundWeight);
+    else factory->AddSignalTree(tree, signalWeight);
+  }
+  factory->SetWeightExpression("EventWeight");
+  factory->PrepareTrainingAndTestTree(TCut(mycuts),TString("SplitMode=Alternate"));
+
+  // ---- Book MVA methods
+  factory->BookMethod( TMVA::Types::kBDT,"BDT","!H:!V:NTrees=200:MaxDepth=4:BoostType=AdaBoost:AdaBoostBeta=0.15:SeparationType=GiniIndex:nCuts=100:PruneMethod=NoPruning:MinNodeSize=1.5%" );
+  
+  // ---- Now you can tell the factory to train, test, and evaluate the MVAs
+  factory->TrainAllMethods();
+  factory->TestAllMethods();
+  factory->EvaluateAllMethods();
+  
+  // Save the output
+  outputFile->cd();
+  events->Write();
+  outputFile->Close();
+
+  std::cout << "==> TMVAClassification is done!" << std::endl;
+  for (TFile* f : openfiles) f->Close();
+  delete factory;
+  string weightsfile="./weights/";weightsfile+=xml_file().Data();
+  string cmd="mv "+weightsfile+" "+tmva_out_dir;
+  system(cmd.c_str());
+}
+
+bool bdt_trainer::process_sample(int bg,int sam)const{
+  if(sam==0)return true;//always run on signal
+  if(sam<0)return false;
+  if(is_single_bg(bg))return bg==sam;
+  return true;
+}
+
+int bdt_trainer::which_sam(TString sam)const{
+  bool zh=sam.Contains("125.root")&&(sam.Contains("ZH")||sam.Contains("WH")),tt=sam.Contains("ttbar.root"),db=sam.Contains("ZZ.root")||sam.Contains("WW.root");
+  bool zj=(sam.Contains("Zee")||sam.Contains("Zmumu")||sam.Contains("Ztautau"))&&(sam.Contains("L.root")||sam.Contains("C.root")||sam.Contains("B.root"));
+  if(zh)return 0;
+  if(zj)return 1;
+  if(tt)return 2;
+  if(db)return 3;
+  return -99;
+}
+TString bdt_trainer::sam_tag(int sam)const{
+  if(sam==0)return "-zh125";
+  if(sam==1)return "-zjets";
+  if(sam==2)return "-ttbar";
+  if(sam==3)return "_zz";
+  return "-all";
+}
+TString bdt_trainer::sam_label(int sam)const{
+  if(sam==0)return "ZH125";
+  if(sam==1)return "Z+jets";
+  if(sam==2)return "t#bar{t}";
+  if(sam==3)return "ZZ";
+  return "Z+jets, t#bar{t}";
+}
+pair<double,double> bdt_trainer::optimal_sig(TH1D*sig,TH1D*big)const{
+  vector<double>sigs;int nbins=sig->GetNbinsX();
+  if(nbins!=big->GetNbinsX())return pair<double,double>(-99.,0.);
+  for(int i=1;i<=nbins;i++){
+    double S=sig->Integral(i,-1),B=big->Integral(i,-1);
+    sigs.push_back(S/sqrt(S+B));
+  }
+  int index=distance(sigs.begin(),max_element(sigs.begin(),sigs.end()));
+  double significance=*max_element(sigs.begin(),sigs.end()),cut=sig->GetBinLowEdge(index+1);
+  return pair<double,double>(cut,significance);
+}
+pair<TH1D*,TH1D*> bdt_trainer::transformation_F(TH1D*sig,TH1D*big,bool husk,double zs,double zb)const{
+  TH1D *flip=(TH1D*)sig->Clone(),*flop=(TH1D*)big->Clone();//this is probably unecessary, but something funny is going on, so clone just in case some weird is going on with histograms in the file...
+  if(debug)cerr<<"Transformation F for signal("<<flip->GetName()<<"), background("<<flop->GetName()<<")..."<<endl;
+  int hibin=flip->GetNbinsX();double min=flip->GetXaxis()->GetXmin(),max=flip->GetXaxis()->GetXmax();
+  if(hibin!=flop->GetNbinsX())return pair<TH1D*,TH1D*>(NULL,NULL);
+  if(min!=flop->GetXaxis()->GetXmin())return pair<TH1D*,TH1D*>(NULL,NULL);
+  if(max!=flop->GetXaxis()->GetXmax())return pair<TH1D*,TH1D*>(NULL,NULL);
+  vector<double>newbin_edges={min,max};vector<int>bin_partition={0,hibin};double llrs=0,NB=flop->Integral(),nb=0;
+  while(hibin>0){
+    if(hibin==1)break;
+    double s=flip->GetBinContent(hibin),b=flop->GetBinContent(hibin);
+    if(b<=0.){
+      NB-=b;
+      double avg=0.5*(flop->GetBinContent(hibin-1)+flop->GetBinContent(hibin+1));
+      if(avg<=0.)b=1.e-6;
+      else b=avg;
+      NB+=b;
+    }
+    llrs+=s*log(1+s/b);nb+=b;
+    if(debug)cerr<<"At bin "<<hibin<<", s="<<s<<","<<"b="<<b<<", nb up to "<<nb<<", llrs up to "<<llrs<<", for Z of "<<sqrt(zb*nb/NB)+sqrt(zs*llrs)<<endl;
+    if(sqrt(zb*nb/NB)+sqrt(zs*llrs)>1.){
+      llrs=0.;nb=0.;
+      bin_partition.insert(bin_partition.begin()+1,hibin-1);
+      newbin_edges.insert(newbin_edges.begin()+1,flip->GetBinLowEdge(hibin));
+    }
+    hibin--;
+  }
+  if(debug){
+    cerr<<"Bin partitioning: "<<endl;
+    for(auto d:bin_partition)cerr<<setw(8)<<d;
+    cerr<<endl;
+    for(auto d:newbin_edges)cerr<<setprecision(3)<<setw(8)<<d;
+    cerr<<endl;
+  }
+  TString sn=flip->GetName(),bn=flop->GetName();sn+="_tf";bn+="_tf";int nbins=bin_partition.size()-1;
+  TH1D *patrick=new TH1D(sn,sn,nbins,&newbin_edges[0]),*jane=new TH1D(bn,bn,nbins,&newbin_edges[0]);
+  if(husk)return {patrick,jane};
+  for(int i=0;i<nbins;i++){
+    if(debug)cerr<<"Fill (pos,s,b)=("<<0.5*(newbin_edges[i]+newbin_edges[i+1])<<","<<flip->Integral(bin_partition[i]+1,bin_partition[i+1])<<","<<flop->Integral(bin_partition[i]+1,bin_partition[i+1])<<")"<<endl;
+    patrick->Fill(0.5*(newbin_edges[i]+newbin_edges[i+1]),flip->Integral(bin_partition[i]+1,bin_partition[i+1]));
+    jane->Fill(0.5*(newbin_edges[i]+newbin_edges[i+1]),flop->Integral(bin_partition[i]+1,bin_partition[i+1]));
+  }
+  delete flip;delete flop;
+  return pair<TH1D*,TH1D*>(patrick,jane);
+}
+
+TString bdt_trainer::filename(int bg)const{
+  return tmva_out_dir+"TMVA"+(bg>0&&bg<n_sam()?sam_tag(bg):"")+ftag()+".root";
+}
+
+TString bdt_trainer::ftag()const{
+  TString nom(identifier);
+  if(!nom.BeginsWith("_")&&!nom.BeginsWith("-"))nom.Prepend("-");
+  nom+=btag_str();nom+=region_str();
+  for(auto var:vars)nom+=("-"+var);
+  return nom;
+}
+
+TString bdt_trainer::btag_var(int ratio,bool cts)const{
+  TString var="MV2c";
+  if(ratio==0)var+="00";
+  else if(ratio==10)var+="10";
+  else var+="20";
+  if(!cts)var+="bin";
+  return var;
+}
+
+TString bdt_trainer::cut_str(int cut,int ratio)const{
+  if(btag_ratio_cuts.find(ratio)==btag_ratio_cuts.end())ratio=def_cratio;
+  if(btag_ratio_cuts.at(ratio).find(cut)==btag_ratio_cuts.at(ratio).end()) cut=70;
+  TString beff="-beff";
+  beff+=cut;
+  return beff;
+}
+
+TString bdt_trainer::cut_label(int cut,int ratio)const{
+  if(btag_ratio_cuts.find(ratio)==btag_ratio_cuts.end())ratio=def_cratio;
+  if(btag_ratio_cuts.at(ratio).find(cut)==btag_ratio_cuts.at(ratio).end()) cut=70;
+  TString beff;beff+=cut;beff+="% b-tag eff";
+  return beff;
+}
+
+TString bdt_trainer::region_str(int nt,int nj,bool lptv)const{
+  TString str="-";
+  //tags
+  if(nt<0)str+=0;
+  else if(nt>2)str+=2;
+  else str+=nt;
+  str+="tag";
+
+  //jets
+  if(nt<=2)str+=2;
+  else str+="3p";
+  str+="jet-";
+
+  if(lptv)str+="0_120ptv";
+  else str+="120ptv";
+
+  return str;
+}
+
+TString bdt_trainer::region_label(int nt,int nj,bool lptv)const{
+  TString str="-";
+  //tags
+  if(nt<0)str+=0;
+  else if(nt>2)str+=2;
+  else str+=nt;
+  str+="tag";
+
+  //jets
+  if(nt<=2)str+=2;
+  else str+="3p";
+  str+="jet, ";
+
+  if(lptv)str+="p_{T}^{V}<120 GeV";
+  else str+="p_{T}^{V}>120 GeV";
+
+  return str;
+}
+
+//short for the FixedCutBEff_x weight cuts
+double bdt_trainer::mv2c_cut(int cut,int ratio)const{
+  if(btag_ratio_cuts.find(ratio)==btag_ratio_cuts.end())ratio=def_cratio;//if the charm ratio isn't supported, revert to default working point cuts
+  if(btag_ratio_cuts.at(ratio).find(cut)!=btag_ratio_cuts.at(ratio).end()) return btag_ratio_cuts.at(ratio).at(cut);
+
+  return -0.0436;//MV2c20 70% efficiency working point default
+}
+
+TString bdt_trainer::cuts(int ntag,int njet,int cut,int ratio,bool cts,bool loptv,bool widemll,bool metcut)const{
+  double bcut=mv2c_cut(cut,ratio);TString var=btag_var(ratio,cts),b1=var+"B1",b2=var+"B2";
+  ostringstream cuts;
+  //pTV cut
+  if(loptv)cuts<<"pTV / 1000. < 120";
+  else cuts<<"pTV / 1000. >= 120";
+  
+  //mLL cut
+  if(widemll)cuts<<" && mLL / 1000. > 60 && mLL / 1000. < 110.";
+  else cuts<<" && mLL / 1000. > 83 && mLL / 1000. < 99.";
+
+  //njet cut
+  if(njet>=3)cuts<<" && nJ>=3";
+  else cuts<<" && nJ==2";
+
+  //btag cut
+  if(ntag<=0)cuts<<"&& "<<b1<<"<"<<bcut<<" && "<<b2<<"<"<<bcut;
+  else if(ntag==1)cuts<<"&& (("<<b1<<">="<<bcut<<" && "<<b2<<"<"<<bcut<<") || ("<<b1<<"<"<<bcut<<" && "<<b2<<">="<<bcut<<"))";
+  else cuts<<"&& "<<b1<<">="<<bcut<<" && "<<b2<<">="<<bcut;
+
+  //MET cut (60 GeV cut)
+  if(metcut)cuts<<"&& MET/1000.<60.";
+  return TString(cuts.str());
+}
+
+string bdt_trainer::check_dir(const string&dir)const{
+  string gooddir(dir);
+  if(gooddir.substr(gooddir.length()-1)!="/")gooddir+="/";
+  return gooddir;
+}
+
+pair<double,double> bdt_trainer::print_bdt_plots(TCanvas *c,pair<TH1D*,TH1D*>bleuet,const TString&pdir,const TString&tag,const TString&bglabel){
+  TStyle *style=set_style();style->cd();  c->cd();
+  pair<TH1D*,TH1D*> iris=bdt_dists(false);
+  pair<double,double>hyacinth=optimal_sig(bleuet);
+  int sone=12,bone=8,stwo=0,btwo=20;
+  iris.first->Scale(1./iris.first->Integral());
+  iris.second->Scale(1./iris.second->Integral());
+  bleuet.first->Scale(1./bleuet.first->Integral()*bleuet.first->GetNbinsX()/iris.first->GetNbinsX());
+  bleuet.second->Scale(1./bleuet.second->Integral()*bleuet.first->GetNbinsX()/iris.first->GetNbinsX());
+  iris.first->GetXaxis()->SetLabelSize(0.03);
+  iris.first->GetXaxis()->SetTitleSize(0.04);
+  iris.first->GetXaxis()->SetTitleOffset(0.85);
+  iris.first->GetXaxis()->SetTitle("BDT score");
+  iris.first->GetYaxis()->SetLabelSize(0.03);
+  iris.first->GetYaxis()->SetTitleSize(0.04);
+  iris.first->GetYaxis()->SetTitleOffset(0.85);
+  iris.first->GetYaxis()->SetTitle("a.u.");
+//   vector<TH1D*>bouquet={iris.first,iris.second,bleuet.first,bleuet.second};
+//   auto_limits(bouquet);
+  iris.first->SetFillColorAlpha(color(sone),0.75);iris.first->SetLineColor(kBlack);iris.first->Draw("hist");
+  iris.second->SetFillColorAlpha(color(bone),0.75);iris.second->SetLineColor(kBlack);iris.second->Draw("hist same");
+  bleuet.first->SetMarkerColor(color(stwo));bleuet.first->SetLineColor(color(stwo));bleuet.first->Draw("E same");
+  bleuet.second->SetMarkerColor(color(btwo));bleuet.second->SetLineColor(color(btwo));bleuet.second->Draw("E same");
+  double lo=style->GetPadLeftMargin(),hi=1.-style->GetPadRightMargin();
+  double xmin=iris.first->GetXaxis()->GetXmin(),xmax=iris.first->GetXaxis()->GetXmax(),cut_val=hyacinth.first,line_x=lo+(hi-lo)*(cut_val-xmin)/(xmax-xmin);
+  TLine*line=new TLine();  line->SetLineColor(kSpring-2);  line->SetLineWidth(3);
+  line->DrawLineNDC(line_x,style->GetPadBottomMargin(),line_x,1.-style->GetPadTopMargin());
+  TLatex l=plot_latex();l.SetTextSize(0.05);double flip_flop=0.67,cut_x=(line_x<flip_flop?line_x+0.01:line_x-0.26),bg_x=(line_x<flip_flop?line_x+0.06:line_x-0.15),bg_x_long=(line_x<flip_flop?line_x+0.01:line_x-0.30);
+  if(bglabel.Length()<1.05*tag.Length() && bglabel.Length()>0.5*tag.Length())bg_x=cut_x;
+  else if(bglabel.Length()>1.05*tag.Length())bg_x=bg_x_long;
+  ostringstream cut;cut<<"Cut="<<setprecision(3)<<cut_val<<", sig="<<hyacinth.second;
+  l.DrawLatex(cut_x,0.8,cut.str().c_str());
+  l.DrawLatex(bg_x,0.74,bglabel);
+  c->Print(check_dir(pdir)+"bdt_dist-"+tag+".pdf");
+  return hyacinth;
+}
+
+int bdt_trainer::color(int which)const{
+  int iWhite =0,   iBlack =1,   iGray=920,  iRed   =632, iGreen =416, iBlue=600, iYellow=400, iMagenta=616, iCyan=432,  iOrange=800, iSpring=820, iTeal=840, iAzure =860, iViolet =880, iPink=900;
+  vector<int> colors={iPink+7,iRed,iOrange+7,iOrange-2,iSpring-5,iGreen+2,iTeal-5,iCyan+2,iAzure+1,iBlue+2,iViolet-2,iMagenta+2,iPink+6,iRed+2,iOrange-3,iYellow-3,iSpring-2,iGreen+1,iTeal+2,iCyan-2,iAzure-4,iBlue-3,iViolet+1,iMagenta-7,iWhite,iGray,iGray+1,iGray+2,iGray+3,iBlack};
+  return colors[(which+1)%colors.size()];
+}
+
+TStyle* bdt_trainer::set_style() const{
+  TStyle *style = AtlasStyle();//new TStyle("Plain","");
+  style->SetNumberContours(100); 
+  style->SetPadRightMargin(0.05);
+  style->SetPadLeftMargin(0.10);
+  style->SetPadTopMargin(0.075);
+  style->SetPadBottomMargin(0.11);
+  int n_pts=11;
+//makes standard color palette slightly pastel (purple to red) with: crimson at red, lighter purple and 
+  Double_t R[11]={1.00,0.60,0.20,0.20,0.40,0.20,0.20,0.60,1.00,1.00,0.80};
+  Double_t G[11]={0.60,0.20,0.20,0.60,1.00,1.00,1.00,1.00,1.00,0.60,0.00};
+  Double_t B[11]={1.00,1.00,1.00,1.00,1.00,0.60,0.20,0.20,0.20,0.20,0.00},length[11];
+  for(int i=0;i<n_pts;i++)length[i]=0.1*i;
+  TColor::CreateGradientColorTable(n_pts,length,R,G,B,100);
+//   style->SetPalette(1,0);
+  style->cd();
+  return style;
+}
+
+TLatex bdt_trainer::plot_latex() const{
+  TLatex l; //l.SetTextAlign(12); l.SetTextSize(tsize);
+  l.SetNDC();
+  l.SetTextSize(0.06);
+//   l.SetTextFont(132);
+  //label text color: black
+  l.SetTextColor(kBlack);
+  return l;
+}
+
+void bdt_trainer::auto_limits(vector<TH1D*> loki,double zero)const{
+//   double fat_man=buff_hi*(*max_element(smoke.begin(),smoke.end())),lil_boy=buff_lo*(*min_element(mirrors.begin(),mirrors.end()));
+//   if(lil_boy<0)lil_boy/=(buff_lo*buff_lo);
+  vector<double> smoke,mirrors,shade;
+  for(unsigned int jhist=0; jhist<loki.size();jhist++){
+    for(int ibin=1;ibin<=loki[jhist]->GetNbinsX();ibin++){
+      double val=loki[jhist]->GetBinContent(ibin),err=loki[jhist]->GetBinError(ibin);
+      smoke.push_back(val+err);mirrors.push_back(val-err);shade.push_back(val);
+    }
+  }
+  double fat_man=(*max_element(smoke.begin(),smoke.end())),lil_boy=(*min_element(mirrors.begin(),mirrors.end())),interval=fat_man-lil_boy,hval=fat_man;//(*max_element(shade.begin(),shade.end()));
+  double bumper=(0.1*interval>(hval-zero)*0.01?0.12*interval:(hval-zero)*0.01);
+//   cout<<"in hist "<<loki->GetName()<<", interval/10="<<0.1*interval<<", hval/100="<<hval/100.<<", bumper="<<bumper<<endl;
+  bumper=0.15*interval;
+  fat_man+=4.*bumper;lil_boy-=0.75*bumper;
+  for(unsigned int i=0;i<loki.size();i++)loki[i]->SetAxisRange(lil_boy,fat_man,"Y");
+}
+

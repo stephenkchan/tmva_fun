@@ -1,0 +1,16 @@
+About to execute (script /n/atlasfs/atlascode/backedup/stchan/vhbb/tmva_fun/scripts/finish_std-pct-3jet-lopTV_tF.sh) finish_li /n/atlasfs/atlasdata/atlasdata1/stchan/vhbb/tmva-data/20160510/eff_77/ /n/atlasfs/atlasdata/atlasdata1/stchan/vhbb/tmva-data/20160510/eff_77/output/ -1 3 1 1 0 1 
+
+Begin training for type: std-pct-2tag3jet-0_150ptv
+MAX found MET 0.3283
+MAX found dEtaBB 0.40529
+MAX found dEtaVBB 0.43185
+MAX found pTB2 0.44205
+MAX found MV2c20binB1 0.46152
+MAX found mLL 0.478
+MAX found pTJ3 0.4964
+MAX found pTV 0.50128
+MAX found MV2c20binJ3 0.49768
+MAX found MV2c20binB2 0.46956
+MAX found pTB1 0.46358
+MAX found dPhiVBB 0.46057
+Ranking complete; no finishing necessary!
