@@ -12,7 +12,7 @@ else:
 dat_base="/n/atlasfs/atlasdata/atlasdata1/stchan/vhbb/tmva-data/" if slurm else "/afs/cern.ch/work/s/stchan/vhbb/data/tmva-data/"
 code_base="/n/atlasfs/atlascode/backedup/stchan/vhbb/tmva_fun/" if slurm else "/afs/cern.ch/work/s/stchan/vhbb/tmva_fun/"
 wrk=code_base+"work/"
-tmva_in_dir=dat_base+"20160419_srli/"
+tmva_in_dir=dat_base+"20160705/"
 do_batch=True
 rewrite=False
 if len(sys.argv)>1: tmva_in_dir = sys.argv[1]
@@ -59,8 +59,11 @@ if not os.path.exists(tmva_in_dir):
 if tmva_in_dir[len(tmva_in_dir)-1:] != "/": tmva_in_dir+="/"
 tmva_out_dir=tmva_in_dir+tag+"/"
 scr_dir=code_base+"scripts/"
+log_dir=code_base+'logs/'
 if not os.path.exists(scr_dir):
     os.makedirs(scr_dir)
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
 if not os.path.exists(tmva_out_dir):
     print "Creating %s..."%tmva_out_dir
     os.makedirs(tmva_out_dir)
@@ -110,7 +113,7 @@ precmd= batch_cmd if do_batch else ["sh"]
 
 n_at=0
 for scr in fire_away:
-    log = scr[scr.find('finish'):scr.rfind('.sh')+1]+'.log'
+    log = '{0}{1}.log'.format(log_dir,scr[scr.find('finish'):scr.rfind('.sh')+1])
     cmd = copy.copy(precmd)+['-e',log,'-o',log,scr]
     bilbo=subprocess.Popen(cmd)
     if not do_batch: 
