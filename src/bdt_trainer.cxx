@@ -46,7 +46,7 @@ void bdt_trainer::bdt_dists(bool overwrite,bool do_validation,int seed,int bg){
 }
 
 pair<double,double> bdt_trainer::evts_S_B(int bg)const{
-  TFile*f=TFile::Open(root_file(bg));
+  TFile*f=TFile::Open(root_file(-1));
   TH1D*events=(TH1D*)f->Get("events");
   double sigev=events->GetBinContent(1),bigev;
   if(bg==1)bigev=events->GetBinContent(4+1,-1);//Z+jets; back entries starting at 4

@@ -14,7 +14,7 @@ else:
 dat_base="/n/atlasfs/atlasdata/atlasdata1/stchan/vhbb/tmva-data/" if slurm else "/afs/cern.ch/work/s/stchan/vhbb/data/tmva-data/"
 code_base="/n/atlasfs/atlascode/backedup/stchan/vhbb/tmva_fun/" if slurm else "/afs/cern.ch/work/s/stchan/vhbb/tmva_fun/"
 wrk=code_base+"work/"
-tmva_in_dir=dat_base+"20160510/eff_77/"
+tmva_in_dir=dat_base+"20160419_srli/"
 do_batch=True
 rewrite=False
 if len(sys.argv)>1: tmva_in_dir = sys.argv[1]
@@ -86,10 +86,10 @@ for fil in files:
   elif "LSF_" in fil:
     shutil.rmtree(wrk+fil)
 for tf in [1]:
-  for nj in [2,3]:
-    for lpt in [1,0]:
-      for btv in [0,1]:
-        for i in [-1]:# range(-2,6):
+  for nj in [2]:
+    for lpt in [1]:
+      for btv in [0]:
+        for i in [0]:# range(-2,6):
         #print "\n%i for %s vars are: %s"%(len(i_vars),li_tag(i)," ".join(i_vars))
           snom="%sfinish_%s-%ijet-%spTV%s.sh"%(scr_dir,li_tag(i,btv),nj,"lo" if lpt else "hi",("_tF" if tf else "_std"))
           command="finish_li %s %s %i %i %i %i %i %i"%(tmva_in_dir,tmva_out_dir,i,nj,lpt,btv,rewrite,tf)

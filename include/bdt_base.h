@@ -19,7 +19,6 @@
 #include "TColor.h"
 #include "TSystemDirectory.h"
 #include <fstream>
-#include <iostream>
 #include <sstream>
 #include <algorithm>
 #include <utility>
