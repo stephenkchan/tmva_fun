@@ -1,6 +1,4 @@
-import subprocess
-import sys
-import os
+import subprocess, sys, os,copy
 
 tag="output"
 slurm=False
@@ -112,7 +110,9 @@ precmd= batch_cmd if do_batch else ["sh"]
 
 n_at=0
 for scr in fire_away:
-    bilbo=subprocess.Popen(precmd+[scr])
+    log = scr[scr.find('finish'):scr.rfind('.sh')+1]+'.log'
+    cmd = copy.copy(precmd)+['-e',log,'-o',log,scr]
+    bilbo=subprocess.Popen(cmd)
     if not do_batch: 
       n_at+=1
       print "Doing script %i of %i"%(n_at,len(fire_away))
