@@ -113,7 +113,7 @@ precmd= batch_cmd if do_batch else ["sh"]
 
 n_at=0
 for scr in fire_away:
-    log = '{0}{1}.log'.format(log_dir,scr[scr.find('finish'):scr.rfind('.sh')+1])
+    log = '{0}{1}.log'.format(log_dir,scr[scr.find('finish'):scr.rfind('.sh')])
     cmd = copy.copy(precmd)+['-e',log,'-o',log,scr]
     bilbo=subprocess.Popen(cmd)
     if not do_batch: 
