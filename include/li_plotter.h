@@ -7,11 +7,12 @@
 
 class li_plotter: public li_ranking{
  public:
-  li_plotter(const string&in,const string&out,bool lptv=false,int nj=2,bool btvs=true);
+  li_plotter(const string&in,const string&out,int lptv=0,int nj=2,bool btvs=true);
   vector<TString> all_plots(const TString&pdir,int tDF=0);
-  pair<TString,double> single_plots(int whic,int nj,bool lpt,const TString&pdir,int tDF=0);
+  pair<TString,double> single_plots(int whic,int nj,bool lpt,const TString&pdir,int tDF=0,bool split=false);
 
  protected:
+  bool splitptv;//were events split into pTV categories for training? (yes gives you in principle better separation but lower stats (esp hi pTV))
   string var_log(int tDF=0)const{return log(tag()+tdf_str(tDF));}
 
   int n_li_cases()const{return 6;}

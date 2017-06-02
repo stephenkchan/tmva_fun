@@ -22,14 +22,14 @@ vector<TString> li_plotter::all_plots(const TString&pdir,int tDF){
   return tmva_files;
 }
 
-pair<TString,double> li_plotter::single_plots(int whic,int nj,bool lpt,const TString&pdir,int tDF){
+pair<TString,double> li_plotter::single_plots(int whic,int nj,bool lpt,const TString&pdir,int tDF,bool split){
   TStyle *style=set_style();style->cd();set_pars(whic,nj,lpt);set_tag(tag()+tdf_str(tDF));
   TCanvas *c=new TCanvas(pdir+tag(),pdir+tag(),500,300);
   if(opendir(pdir.Data())==NULL)system(("mkdir -p "+string(pdir.Data())).c_str());
   if(!file_exists(var_log(tDF)))single_rank(whic,nj,lpt);
   vector<TString>vars=print_training_plot(c,tag(),pdir,tDF);
   double sig=0.;vector<int>bgs{-1};//{1,2,-1};
-  for(auto i:bgs)sig=bdt_testing(vars,false,(bdt_base)*this).print_test_bdts(c,pdir,i,tDF).second;
+  for(auto i:bgs)sig=bdt_testing(vars,false,(bdt_base)*this).print_test_bdts(c,pdir,i,tDF,split).second;
   delete c;
   return {filename(vars),sig};
 }

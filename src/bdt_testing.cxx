@@ -1,5 +1,5 @@
 #include "bdt_testing.h"
-bdt_testing::bdt_testing(const string&in,const string&out,const string&tag,const vector<TString>&vs,bool overwrite,int nt,int nj,int eff_cut,int ratio,bool cts,bool lptv,bool wmll,bool met):
+bdt_testing::bdt_testing(const string&in,const string&out,const string&tag,const vector<TString>&vs,bool overwrite,int nt,int nj,int eff_cut,int ratio,bool cts,int lptv,bool wmll,bool met):
   bdt_trainer(in,out,tag,vs,overwrite,nt,nj,eff_cut,ratio,cts,lptv,wmll,met){}
 
 bdt_testing::bdt_testing(const vector<TString>&vs,bool overwrite,const bdt_base&base):
@@ -7,7 +7,7 @@ bdt_testing::bdt_testing(const vector<TString>&vs,bool overwrite,const bdt_base&
 
 bdt_testing::bdt_testing(const bdt_trainer&train):bdt_trainer(train){}
 
-pair<TH1D*,TH1D*> bdt_testing::make_testing_bdt_dists(int bg,int trans_DF)const{
+pair<TH1D*,TH1D*> bdt_testing::make_testing_bdt_dists(int bg,int trans_DF,bool split)const{
   pair<double,double>sb(evts_S_B(bg));
   if(debug){
     cout<<filename(vars)<<" S="<<sb.first<<", B="<<sb.second<<" "<<start.first<<" "<<start.second<<endl;
@@ -24,7 +24,10 @@ pair<TH1D*,TH1D*> bdt_testing::make_testing_bdt_dists(int bg,int trans_DF)const{
   for(auto var:extra_vars){
     if(lisbon.find(var)==lisbon.end())lisbon[var]=pair<float,TBranch*>(0.,NULL);
   }
-  reader->BookMVA("BDT",tmva_out_dir+xml_file());TBranch*bev,*bnj;unsigned long long ev;int nj;
+  TString xml=tmva_out_dir+xml_file(split);
+  //if(debug)
+  cout<<"Evaluation XML: "<<xml<<endl;
+  reader->BookMVA("BDT",xml);TBranch*bev,*bnj;unsigned long long ev;int nj;
 
   TSystemDirectory dir(tmva_in_dir.c_str(),tmva_in_dir.c_str());  std::vector<TFile*> openfiles;
   TList* files = dir.GetListOfFiles(); TFile* inputFile;
@@ -49,8 +52,8 @@ pair<TH1D*,TH1D*> bdt_testing::make_testing_bdt_dists(int bg,int trans_DF)const{
       bev->GetEntry(iev);bnj->GetEntry(iev);
       /*
       if(passes_cut(lisbon,ev,nj)!=passes_cut(tree,ev,cut)){
-	cout<<fileName<<"---Incompatible cut evaluation (branch="<<passes_cut(lisbon,ev,nj)<<",string="<<passes_cut(tree,ev,cut)<<"); the string cut was "<<TString(Form("%s  && EventNumber==%llu",cut.Data(),ev)).Data()<<endl;
-	cout<<"There would have been: "<<tree->Draw("",Form("%s  && EventNumber==%llu",cut.Data(),ev))<<endl;
+	cout<<fileName<<"---Incompatible cut evaluation (branch="<<passes_cut(lisbon,ev,nj)<<",string="<<passes_cut(tree,ev,cut)<<"); the string cut was "<<TString(TString::Format("%s  && EventNumber==%llu",cut.Data(),ev)).Data()<<endl;
+	cout<<"There would have been: "<<tree->Draw("",TString::Format("%s  && EventNumber==%llu",cut.Data(),ev))<<endl;
       }
       */
       if(!passes_cut(lisbon,ev,nj))continue;
@@ -87,14 +90,16 @@ bool bdt_testing::passes_cut(const map<TString,pair<float,TBranch*> >& vars,int 
   if(vars.at(btag_var(charm_ratio,cts_mv2)+"B2").first<=mv2c_cut(beff_cut,charm_ratio))tags--;
   if(tags<ntag)return false;
 //   cout<<vars.at("pTV").first<<" "<<vars.at("MV2c20B2").first<<" "<<vars.at("MV2c20B1").first<<" "<<vars.at("mLL").first<<" "<<ev<<" "<<nj<<endl;
-  if(0.001*vars.at("pTV").first>=150.&&loptv==1)return false;
-  if(0.001*vars.at("pTV").first<150.&& loptv==0)return false;
+  double ptv=0.001*vars.at("pTV").first;
+  if(ptv>75. && ptvbin==0)return false;//(0,75] GeV
+  if((ptv<=75.||ptv>150.) && ptvbin==1)return false;//(75,150] GeV
+  if(ptv<=150. && ptvbin==2)return false;//(150,\infty) GeV
   if(vars.at("mLL").first/1000.<=60 || vars.at("mLL").first/1000.>=110.)return false;
   return true;
 }
 
 bool bdt_testing::passes_cut(TTree*t,int ev,const TString& cut)const{
-  if(debug)cout<<TString(Form("%s  && EventNumber==%i",cut.Data(),ev)).Data()<<endl;
+  if(debug)cout<<TString(TString::Format("%s  && EventNumber==%i",cut.Data(),ev)).Data()<<endl;
   if(ev%3!=0)return false;
-  return t->Draw("",Form("%s  && EventNumber==%i",cut.Data(),ev))>0;
+  return t->Draw("",TString::Format("%s  && EventNumber==%i",cut.Data(),ev))>0;
 }

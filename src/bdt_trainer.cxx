@@ -46,7 +46,8 @@ void bdt_trainer::bdt_dists(bool overwrite,bool do_validation,int seed,int bg){
 }
 
 pair<double,double> bdt_trainer::evts_S_B(int bg)const{
-  TFile*f=TFile::Open(root_file(-1));
+  TFile*f=TFile::Open(root_file());
+  if(!f)f=TFile::Open(root_file(bg));
   TH1D*events=(TH1D*)f->Get("events");
   double sigev=events->GetBinContent(1),bigev;
   if(bg==1)bigev=events->GetBinContent(4+1,-1);//Z+jets; back entries starting at 4
@@ -72,7 +73,7 @@ void bdt_trainer::train(int bg,bool do_validation,int seed)const{
 
   TMVA::Factory *factory = new TMVA::Factory( xml_tag(do_validation,seed), outputFile,"!V:Silent:Color:DrawProgressBar:AnalysisType=Classification" );
   for(auto var:vars)factory->AddVariable(var,'F');
-  factory->AddSpectator("EventNumber",'I');
+//   factory->AddSpectator("EventNumber",'I');
 
   TH1D* events=new TH1D("events","events",n_sam(),-0.5,n_sam()-0.5);
   // global event weights per tree (see below for setting event-wise weights)
@@ -81,8 +82,9 @@ void bdt_trainer::train(int bg,bool do_validation,int seed)const{
   TList* files = dir.GetListOfFiles(); TFile* inputFile;
   pair<double,double>sbg;
   //test cut: if our seed is even, we want the test_cut to be EventNumber%2==0, if odd EventNumber%2==1 and vice versa for the train_cut
-  int test_int=(seed%2)!=0,train_int=(seed%2)==0;
-  TString cut=these_cuts(),test_cut=Form("%s && EventNumber%2==%i",mycuts.Data(),test_int),train_cut=Form("%s && EventNumber%2==%i",mycuts.Data(),train_int);bool is_manual=kseed>0;
+  int test_int=((seed%2)!=0?1:0),train_int=((seed%2)==0?1:0);
+//   TString cut=these_cuts(),test_cut(Form("%s && EventNumber%%2==%i",mycuts.Data(),test_int)),train_cut(Form("%s && EventNumber%%2==%i",mycuts.Data(),train_int));bool is_manual=kseed>0;
+  TString cut=these_cuts(),test_cut(Form("%s && EventNumber%%2==%i",mycuts.Data(),test_int)),train_cut(Form("%s && EventNumber%%2==%i",mycuts.Data(),train_int));bool is_manual=kseed>0;
   for (TObject* obj : *files) {
     TString fileName = obj->GetName();
     int sam=which_sam(fileName);
@@ -90,16 +92,19 @@ void bdt_trainer::train(int bg,bool do_validation,int seed)const{
     if(!process_sample(bg,sam))continue;
     fileName.Prepend(dir.GetName());
     inputFile = TFile::Open(fileName);
+    inputFile->cd();
     openfiles.push_back(inputFile);
     TTree* tree = (TTree*) inputFile->Get("Nominal");
     if (tree==NULL)continue;
     if (tree->GetEntries() == 0) continue;
+    silence_tree(tree);
     double event=tree->Draw("EventWeight>>hist",cut);
     TH1F *hist = (TH1F*)gDirectory->Get("hist");  event*=hist->GetMean();
     events->Fill(sam,event);
+    if(debug)std::cout<<"After the tree draw "<<fileName<<" with "<<event<<" events"<<std::endl;
     if(is_manual){
-      factory->AddTree(tree,(sam?"Background":"Signal"),(sam?backgroundWeight:signalWeight),TCut(train_cut),"train");
-      factory->AddTree(tree,(sam?"Background":"Signal"),(sam?backgroundWeight:signalWeight), TCut(test_cut), "test");
+      factory->AddTree(tree,(sam?"Background":"Signal"),(sam?backgroundWeight:signalWeight),TCut(train_cut),TMVA::Types::kTraining);
+      factory->AddTree(tree,(sam?"Background":"Signal"),(sam?backgroundWeight:signalWeight), TCut(test_cut), TMVA::Types::kTesting);
     }
     else{
       if(sam)factory->AddBackgroundTree(tree, backgroundWeight);
@@ -107,13 +112,16 @@ void bdt_trainer::train(int bg,bool do_validation,int seed)const{
     }
   }
   factory->SetWeightExpression("EventWeight");
-  TString test_train_config="SplitMode=Alternate:NormMode=EqualNumEvents";
-  if(seed!=0)test_train_config=Form("SplitMode=Alternate:NormMode=EqualNumEvents:SplitSeed=%i",seed);
+  TString test_train_config=(is_manual?"":"SplitMode=Alternate:NormMode=EqualNumEvents");
+//   if(seed!=0)test_train_config=Form("SplitMode=Alternate:NormMode=EqualNumEvents:SplitSeed=%i",seed);//I don't this seed means what you think it means.  If you have alternate, then this may fuck with things; so let's try and do things without
+  if(debug)std::cout<<"Files read...about to prepare training and test trees"<<std::endl;
+//   outputFile->cd();
   factory->PrepareTrainingAndTestTree(TCut(mycuts),test_train_config);
 
+  if(debug)std::cout<<"Trees ready...about to book method"<<std::endl;
   // ---- Book MVA methods
   factory->BookMethod( TMVA::Types::kBDT,"BDT","!H:!V:NTrees=200:MaxDepth=4:BoostType=AdaBoost:AdaBoostBeta=0.15:SeparationType=GiniIndex:nCuts=100:PruneMethod=NoPruning:MinNodeSize=1.5%" );
-  
+  if(debug)std::cout<<"Method booked...about to train"<<std::endl;
   // ---- Now you can tell the factory to train, test, and evaluate the MVAs
   factory->TrainAllMethods();
   factory->TestAllMethods();
@@ -130,6 +138,13 @@ void bdt_trainer::train(int bg,bool do_validation,int seed)const{
   string weightsfile="./weights/";weightsfile+=xml_file(do_validation,seed);
   string cmd="mv "+weightsfile+" "+tmva_out_dir;
   system(cmd.c_str());
+}
+
+void bdt_trainer::silence_tree(TTree*tree)const{
+  std::set<TString> check={"EventNumber","EventWeight","mLL","dRBB","pTV","nSigJet","nBTag","MET"};//variables used to denote regions
+  tree->SetBranchStatus("*",0);
+  for(const auto&v:vars)check.insert(v);
+  for(const auto&c:check)tree->SetBranchStatus(c,1);
 }
 
 pair<double,double> bdt_trainer::print_bdt_plots(TCanvas *c,pair<TH1D*,TH1D*>iris,const TString&pdir,const TString&tag,const TString&bglabel,bool funky_style,double scut){

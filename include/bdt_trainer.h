@@ -22,16 +22,22 @@ class bdt_trainer : public bdt_base{
   pair<double,double> evts_S_B(int bg)const;
 
  protected:
+
+  //
   void train(int bg,bool do_validation,int seed)const;
+  void silence_tree(TTree*tree)const;
   TString root_file(int bg,bool do_validation,int seed)const{return (is_standard(do_validation,seed)?filename(vars,bg):production_filename(bg));}
   TString root_file(int bg=-1)const{return root_file(bg,validate,kseed);}
   void initialize(bool overwrite,bool do_validation,int seed);
   bool is_standard(bool do_validation,int seed)const{return do_validation && seed==0;}
-  TString xml_tag(bool do_validation,int seed)const{return (is_standard(do_validation,seed)?"TMVAClassification"+ftag(vars):production_tag());}
-  TString xml_file(bool do_validation,int seed)const{return xml_tag(do_validation,seed)+"_BDT.weights.xml";}
-  TString xml_file()const{return xml_file(validate,kseed);}
-  TString production_tag(int bg=-1)const{ return Form("Harvard%s-%s_k-fold-%iof2",sam_tag(bg==0?-1:bg).Data(),identifier.c_str(),kseed%2==1);}
+  TString xml_tag(bool do_validation,int seed,bool split=true)const{return (is_standard(do_validation,seed)?"TMVAClassification"+ftag(vars,split):production_tag());}
+  TString xml_file(bool do_validation,int seed,bool split=true)const{return xml_tag(do_validation,seed,split)+"_BDT.weights.xml";}
+  TString xml_file(bool split)const{return xml_file(validate,kseed,split);}
+  TString production_tag(int bg=-1)const{ return Form("Harvard_13TeV_llbb_%s_%iof2",identifier.c_str(),kseed%2==1);}
   TString production_filename(int bg=-1)const{return Form("%s%s.root",tmva_out_dir.c_str(),production_tag(bg).Data());}
+
+  //file names should look like:
+  //TMVAClassification_BDT_LiverpoolBmham_8TeV_llbb_2tag2jet_ptv0_120_ZllH125_0of2_root5.34.05_v3.0.xml;
 
   //variables to train, ordered
   vector<TString> vars;

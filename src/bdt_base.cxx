@@ -1,11 +1,12 @@
 #include "bdt_base.h"
 
-bdt_base::bdt_base(const string&in,const string&out,const string&tag,int nt,int nj,int eff_cut,int ratio,bool cts,int lptv,bool use_btvs,bool wmll,bool met)
-  :debug(false),tmva_in_dir(check_dir(in)),tmva_out_dir(check_mkdir(out)),ntag(nt),njet(nj),beff_cut(eff_cut),charm_ratio(ratio),cts_mv2(cts),loptv(lptv),use_btagvs(use_btvs),widemll(wmll),metcut(met){
+bdt_base::bdt_base(const string&in,const string&out,const string&tag,int nt,int nj,int eff_cut,int ratio,bool cts,int ptv,bool use_btvs,bool wmll,bool met)
+  :debug(true),tmva_in_dir(check_dir(in)),tmva_out_dir(check_mkdir(out)),identifier(tag),ntag(nt),njet(nj),beff_cut(eff_cut),charm_ratio(ratio),cts_mv2(cts),ptvbin(ptv),use_btagvs(use_btvs),widemll(wmll),metcut(met){
   //akt4EM FixedCutBEff_90,85,77,70,60,50,30 (numbers are nominal tag efficiencies)
   //60,70,77,85 are supported by the tool right now
-  btag_ratio_cuts={ {20,{{90,-0.9185}, {85,-0.7887}, {80,-0.5911}, {77,-0.4434}, {70,-0.0436}, {60,0.4496}, {50,0.7535}, {30,0.9540}}} };
-  def_cratio=btag_ratio_cuts.begin()->first;
+  btag_ratio_cuts={ {10,{{100,0.0}, {85,0.1758}, {77,0.6459}, {70,0.8244}, {60,0.9349}, {50,0.9769}, {30,0.9977}, {0,1.0}}},
+		    {20,{{90,-0.9185}, {85,-0.7887}, {80,-0.5911}, {77,-0.4434}, {70,-0.0436}, {60,0.4496}, {50,0.7535}, {30,0.9540}}}};
+  def_cratio=10;//btag_ratio_cuts.begin()->first;
   if(btag_ratio_cuts.begin()->second.find(70)==btag_ratio_cuts.begin()->second.end()){
     int dist=9999;
     for(auto&cutpair:btag_ratio_cuts.begin()->second){
@@ -25,8 +26,15 @@ bool bdt_base::process_sample(int bg,int sam)const{
 }
 
 int bdt_base::which_sam(TString sam)const{
-  bool zh=sam.Contains("125.root")&&(sam.Contains("ZH")||sam.Contains("WH")),tt=sam.Contains("ttbar.root"),db=(sam.Contains("ZZ")||sam.Contains("WW"))&&sam.Contains(".root");
-  bool zlep=(sam.Contains("Zee")||sam.Contains("Zmumu")||sam.Contains("Ztautau"));bool zl=zlep&&sam.Contains("L.root"),zc=zlep&&sam.Contains("C.root"),zb=zlep&&sam.Contains("B.root");
+  TPRegexp signal(".*[WZ]H.*125.*.root"),zjets(".*Z(ee|mumu|tautau)(B|C|L).*.root"),wjets(".*W(en|munu|taunu)(B|C|L).*.root"),diboson(".*[WZ][WZ].*.root");
+  TObjArray *zj=zjets.MatchS(sam),*dbo=diboson.MatchS(sam),*zh125=signal.MatchS(sam),*wje=wjets.MatchS(sam);
+  bool zh=zh125->GetEntries()>0,zlep=zj->GetEntries()==3,db=dbo->GetEntries()>0,zb=false,zc=false,zl=false,tt=sam.Contains("ttbar");
+  if(zlep){
+    TString flavor(zj->At(2)->GetName());
+    zb = flavor=="B";zc = flavor=="C";zl = flavor=="L";
+  }
+  bool singletop=sam.Contains("stop"),mj=sam.Contains("multijet"),wj=wje->GetEntries()>0;
+  bool ancillary=singletop||mj||wj;
   if(zh)return 0;
 //   if(zl||zc||zb)return 1;
   if(tt)return 2;
@@ -34,26 +42,29 @@ int bdt_base::which_sam(TString sam)const{
   if(zl)return 4;
   if(zc)return 5;
   if(zb)return 6;
+  if(ancillary)return 7;
   return -99;
 }
 TString bdt_base::sam_tag(int sam)const{
   if(sam==0)return "-zh125";
   if(sam==1)return "-zjets";
   if(sam==2)return "-ttbar";
-  if(sam==3)return "_zz";
+  if(sam==3)return "-db";
   if(sam==4)return "-zl";
   if(sam==5)return "-zc";
   if(sam==6)return "-zb";
+  if(sam==7)return "-anc";
   return "-all";
 }
 TString bdt_base::sam_label(int sam)const{
   if(sam==0)return "ZH125";
   if(sam==1)return "Z+jets";
   if(sam==2)return "t#bar{t}";
-  if(sam==3)return "ZZ";
+  if(sam==3)return "diboson";
   if(sam==4)return "Zl";
   if(sam==5)return "Zc";
   if(sam==6)return "Zb";
+  if(sam==7)return "other";
   return "Z+jets, t#bar{t}";
 }
 pair<double,double> bdt_base::cumulat_sig(TH1D*sig,TH1D*big)const{
@@ -98,9 +109,9 @@ pair<TH1D*,TH1D*> bdt_base::transformation_DF(TH1D*sig,TH1D*big,bool husk,bool d
     double flep=0.9;//default is nothing, except we always assume two leptons
     double ftag=(beff_cut<=70?1.4:0.6);//if LL 1.4, MM/TT 0.6
     double fjet=(njet==2?0.8:1.2);//0.8 for 2 jet, 1.2 for 3 jet
-    double fptv=(loptv?0.6:1.4),prefactor=flep*ftag*fjet*fptv;
+    double fptv=(ptvbin==0?0.6:1.4),prefactor=flep*ftag*fjet*fptv;
     zs=prefactor*6.;zb=prefactor*4.;
-    zs=5.;zb=5.;//hack for harmonization with Liv/Bir trans_D
+    zs=10.;zb=10.;//hack for harmonization with Liv/Bir trans_D
   }
   TH1D *flip=(TH1D*)sig->Clone(),*flop=(TH1D*)big->Clone();//this is probably unecessary, but something funny is going on, so clone just in case some weird is going on with histograms in the file...
   vector<int>dragon=HistoTransform().getRebinBins(flop,flip,(d?6:12));  TString tag=(d?"_td":"_tf"),sn=Form("%s_%s%s",identifier.c_str(),flip->GetName(),tag.Data()),bn=Form("%s_%s%s",identifier.c_str(),flop->GetName(),tag.Data());
@@ -180,10 +191,12 @@ void bdt_base::print_info_plot_2d(const vector<vector<double> >&info,const vecto
 
 TString bdt_base::btag_var(int ratio,bool cts)const{
   TString var="MV2c";
-  if(ratio==0)var+="00";
-  else if(ratio==10)var+="10";
-  else var+="20";
-  if(!cts)var+="bin";
+  if(identifier<"20161000"){
+    if(ratio==0)var+="00";
+    else if(ratio==10)var+="10";
+    else var+="20";
+    if(!cts)var+="bin";
+  }
   return var;
 }
 
@@ -202,7 +215,20 @@ TString bdt_base::cut_label(int cut,int ratio)const{
   return beff;
 }
 
-TString bdt_base::region_str(int nt,int nj,bool lptv)const{
+TString bdt_base::ptv_str(int ptv)const{
+  if(ptv==0)return "0_75ptv";
+  else if(ptv==1)return "75_150ptv";
+  else if(ptv==2) return "150ptv";
+  return "allptv";
+}
+TString bdt_base::ptv_label(int ptv)const{
+  if(ptv==0)return "p_{T}^{V}<75 GeV";
+  else if(ptv==1)return "75GeV<p_{T}^{V}<150 GeV";
+  else if(ptv==2)return "p_{T}^{V}>150 GeV";
+  return "all p_{T}^{V}";
+}
+
+TString bdt_base::region_str(int nt,int nj,int ptv)const{
   TString str="-";
   //tags
   if(nt<0)str+=0;
@@ -216,14 +242,13 @@ TString bdt_base::region_str(int nt,int nj,bool lptv)const{
   else str+=3;//3p
   str+="jet-";
 
-  if(lptv==1)str+="0_150ptv";
-  else if(lptv==0) str+="150ptv";
-  else str+="allptv";
+  //ptv
+  str+=ptv_str(ptv);
 
   return str;
 }
 
-TString bdt_base::region_label(int nt,int nj,bool lptv)const{
+TString bdt_base::region_label(int nt,int nj,int ptv)const{
   TString str;
   //tags
   if(nt<0)str+=0;
@@ -237,8 +262,8 @@ TString bdt_base::region_label(int nt,int nj,bool lptv)const{
   else str+=3;
   str+="jet, ";
 
-  if(lptv==1)str+="p_{T}^{V}<150 GeV";
-  else if(lptv==0) str+="p_{T}^{V}>150 GeV";
+  //ptv
+  str+=ptv_label(ptv);
 
   return str;
 }
@@ -257,14 +282,16 @@ double bdt_base::mv2c_cut(int cut,int ratio)const{
   return -0.0436;//MV2c20 70% efficiency working point default
 }
 
-TString bdt_base::cuts(int nt,int nj,int cut,int ratio,bool cts,bool lptv,bool wmll,bool met)const{
+TString bdt_base::cuts(int nt,int nj,int cut,int ratio,bool cts,int ptv,bool wmll,bool met)const{
   double bcut=mv2c_cut(cut,ratio);TString var=btag_var(ratio,cts),b1=var+"B1",b2=var+"B2";
   ostringstream cuts;
   //common dR cut
   cuts<<"(pTV/1000.>=200 || (pTV/1000.<200&&dRBB>0.7))";
+
   //pTV cut
-  if(lptv==1)cuts<<"&& pTV / 1000. < 150";
-  else if(lptv==0) cuts<<"&& pTV / 1000. >= 150";
+  if(ptv==0)cuts<<"&& pTV / 1000. < 75";
+  else if(ptv==1) cuts<<"&& pTV / 1000. >= 75 && pTV / 1000. < 150";
+  else if(ptv==2) cuts<<"&& pTV / 1000. >= 150";
   //default is inclusive
 
   //mLL cut
@@ -277,11 +304,13 @@ TString bdt_base::cuts(int nt,int nj,int cut,int ratio,bool cts,bool lptv,bool w
   else cuts<<" && nSigJet==2";
 
   //btag cut
-  if(use_btagvs||always_tag){
+  if(use_btagvs){
     if(nt<=0)cuts<<"&& "<<b1<<"<"<<bcut<<" && "<<b2<<"<"<<bcut;
     else if(nt==1)cuts<<"&& (("<<b1<<">="<<bcut<<" && "<<b2<<"<"<<bcut<<") || ("<<b1<<"<"<<bcut<<" && "<<b2<<">="<<bcut<<"))";
     else cuts<<"&& "<<b1<<">="<<bcut<<" && "<<b2<<">="<<bcut;
   }
+  else cuts<<" && nBTag==2";//good ol' truth-tagging
+
   //MET cut (60 GeV cut)
   if(met)cuts<<"&& MET/1000.<60.";
   return TString(cuts.str());
@@ -375,8 +404,11 @@ void bdt_base::auto_limits(vector<TH1D*> loki,double zero)const{
   for(unsigned int i=0;i<loki.size();i++)loki[i]->SetAxisRange(lil_boy,fat_man,"Y");
 }
 
-TString bdt_base::ftag(const vector<TString>&vars)const{
-  TString tag("-");tag+=identifier;tag+=btag_str();tag+=region_str();
+TString bdt_base::ftag(const vector<TString>&vars,bool split)const{
+  TString tag("-");
+  tag+=identifier;
+  if(use_btagvs)tag+=btag_str();
+  if(!tag.Contains(region_str(split)))tag+=region_str(split);
   for(auto v:vars)tag+=("-"+v);
   return tag;
 }

@@ -4,7 +4,7 @@
 
 class li_ranking : public bdt_ranker{
  public:
-  li_ranking(const string&in,const string&out,bool lptv=false,int nj=2,bool btv=true);
+  li_ranking(const string&in,const string&out,int lptv=0,int nj=2,bool btv=true);
   void all_ranks(bool overwrite=false,int tDF=0);
   void single_rank(int whic,int nj,bool lpt,bool overwrite=false,int tDF=0);
   void finish_rank(int whic,int nj,bool lpt,bool overwrite=false,int tDF=0);
@@ -20,7 +20,7 @@ class li_ranking : public bdt_ranker{
   int n_li_cases()const{return 6;}
   int n_std_min()const{return -1;}
   vector<int>jets()const{return{2,3};}
-  vector<int>ptvs()const{return{1,0};}//it's technically a bool; true is lo pTV
+  vector<int>ptvs()const{return{1,0};}//it used to be a bool; true is lo pTV
   vector<int>cases()const{return{-2,-1,0,1,2,3,4};}
   int which;
 };

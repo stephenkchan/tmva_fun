@@ -1,6 +1,6 @@
 #include "li_ranking.h"
 
-li_ranking::li_ranking(const string&in,const string&out,bool lptv,int nj,bool btvs):bdt_ranker(in,out,vector<TString>(),vector<TString>(),2,nj,77,20,false,lptv,btvs){}
+li_ranking::li_ranking(const string&in,const string&out,int lptv,int nj,bool btvs):bdt_ranker(in,out,vector<TString>(),vector<TString>(),2,nj,77,20,false,lptv,btvs){}
 
 void li_ranking::all_ranks(bool overwrite,int tDF){
   for(auto nj:jets()){

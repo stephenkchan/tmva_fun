@@ -1,12 +1,12 @@
 #include "bdt_ranker.h"
 
-bdt_ranker::bdt_ranker(const string&in,const string&out,const vector<TString>&bs,const vector<TString>&vs,int nt,int nj,int eff_cut,int ratio,bool cts,bool lptv,bool btv,bool wmll,bool met):
+bdt_ranker::bdt_ranker(const string&in,const string&out,const vector<TString>&bs,const vector<TString>&vs,int nt,int nj,int eff_cut,int ratio,bool cts,int lptv,bool btv,bool wmll,bool met):
   bdt_base(in,out,"rank",nt,nj,eff_cut,ratio,cts,lptv,btv,wmll,met),ranked(bs),unranked(vs){}
 
 bdt_ranker::bdt_ranker(const string&in,const string&out,const vector<TString>&bs,const vector<TString>&vs,const bdt_base&base):
   bdt_base(base),ranked(bs),unranked(vs){}
 
-void bdt_ranker::do_ranking(const string&tag,bool overwrite,int trans_DF){
+vector<double> bdt_ranker::ranking_front_matter(const string&tag,bool overwrite,int trans_DF){
   string pdir=check_mkdir(tmva_out_dir+"bdt_spikes");
   set_tag(tag+tdf_str(trans_DF));
   cout<<"Begin ranking: "<<log()<<" "<<tmva_out_dir<<" "<<these_cuts()<<endl;
@@ -25,6 +25,13 @@ void bdt_ranker::do_ranking(const string&tag,bool overwrite,int trans_DF){
   for(auto a:unranked)fout<<a<<" ";
   fout<<endl<<"Significance starts at "<<daisy_chain.back()<<endl;
   fout<<"------------------------------------------------------------------------------------------------"<<endl;
+  fout.close();
+  return daisy_chain;
+}
+void bdt_ranker::do_ranking(const string&tag,bool overwrite,int trans_DF){
+  vector<double>daisy_chain=ranking_front_matter(tag,overwrite,trans_DF);
+  vector<TString> done(ranked),to_do(unranked);
+  ofstream fout(log().c_str(),std::ofstream::app);
   while(!to_do.empty()){
     rank_loop_one_var(to_do,done,daisy_chain,fout,tag,overwrite,trans_DF);
   }
@@ -35,10 +42,12 @@ void bdt_ranker::finish_ranking(const string&tag,bool overwrite,int trans_DF){
   set_tag(tag+tdf_str(trans_DF));  string lname=log();
   if(!file_exists(lname)||overwrite){do_ranking(tag,true,trans_DF);return;}
   ifstream hey(lname.c_str());vector<TString>to_do(unranked),done(ranked);string line,prevline;vector<double>daisy_chain;
+  map<TString,double>buffer;bool buffer_was_last=false;
   while(hey.good()){
     prevline=line;
     getline(hey,line);
     if(line.find("UNRANKED VARIABLES: ")==0){
+      buffer_was_last=false;
       vector<TString>daredevil(unranked);vector<string>nlist=line_to_words(line.substr(line.find(":")+1));
       for(auto word:nlist){
 	int killme=-1;
@@ -52,8 +61,17 @@ void bdt_ranker::finish_ranking(const string&tag,bool overwrite,int trans_DF){
 	return;
       }
     }
-    else if(line.find("Significance starts at ")==0)daisy_chain.push_back(atof(line.substr(line.find("at")+3).c_str()));
+    else if(line.find("Significance starts at ")==0){
+      buffer_was_last=false;
+      daisy_chain.push_back(atof(line.substr(line.find("at")+3).c_str()));
+    }
+    else if(line.find("BUFFER: ")==0){
+      buffer_was_last=true;
+      vector<string>stuff=line_to_words(line.substr(line.find(":")+1),vector<char>(1,' '));
+      for(int buff=0;buff<(int)stuff.size();buff++)buffer[stuff[buff].substr(0,stuff[buff].find(","))]=atof(stuff[buff].substr(stuff[buff].find(",")+1).c_str());
+    }
     else if(line.find("Maximum is (")==0){
+      buffer_was_last=false;
       TString word(line.substr(line.find("(")+1,line.find(",")-line.find("(")-1)), number(line.substr(line.find(",")+1,line.find(")")-line.find(",")-1));int killme=-1;
       for(int i=0;i<(int)to_do.size();i++){
 	if(word==to_do[i]){killme=i;break;}
@@ -65,14 +83,16 @@ void bdt_ranker::finish_ranking(const string&tag,bool overwrite,int trans_DF){
       }
     }
     else if(line.find("DAISY_CHAIN:")==0){
+      buffer_was_last=false;
       cout<<"Ranking complete; no finishing necessary!  Will check kfold files..."<<endl;
       produce_kfold_files(done,overwrite,trans_DF);
       return;
     }
+    else  buffer_was_last=false;
   }
   hey.close();
   cout<<"Last line was "<<line<<" prevline was "<<prevline<<endl;
-  bool print_header=!((line.find("Significances for ")!=0)||(prevline.find("Significances for ")!=0&&line==""));//sometimes printing will freeze in the middle of a ranking loop because of spike validation printing; skip printing of the header it it's already there---histogram processing will have a hard time of it otherwise
+  bool print_header=!((line.find("Significances for ")!=0)||(prevline.find("Significances for ")!=0&&line=="")||buffer_was_last);//sometimes printing will freeze in the middle of a ranking loop because of spike validation printing; skip printing of the header it it's already there---histogram processing will have a hard time of it otherwise
   ofstream fout(lname.c_str(),std::ofstream::app);
   cout<<"FINISHING ranking in "<<lname<<endl;
   DIR*lana=opendir(tmva_out_dir.c_str());struct dirent*archer;
@@ -83,47 +103,58 @@ void bdt_ranker::finish_ranking(const string&tag,bool overwrite,int trans_DF){
     }
   }
   while(!to_do.empty()){
-    rank_loop_one_var(to_do,done,daisy_chain,fout,tag,overwrite,trans_DF,print_header);
-    print_header=true;
+    rank_loop_one_var(to_do,done,daisy_chain,fout,tag,overwrite,trans_DF,print_header,(buffer_was_last?buffer:map<TString,double>()));
+    print_header=true;buffer_was_last=false;
   }
   ranking_back_matter(done,daisy_chain,fout,overwrite,trans_DF);
 }
 
-void bdt_ranker::ranking_back_matter(const vector<TString>&done,const vector<double>&daisy_chain,ofstream&fout,bool overwrite,int trans_DF)const{
+void bdt_ranker::ranking_back_matter(const vector<TString>&done,const vector<double>&daisy_chain,ofstream&fout,bool overwrite,int trans_DF,bool print)const{
   int offset=20;
-  fout<<"Ranking Complete.  The training path looks like:"<<endl;
-  fout<<"Began with: ";
-  for(auto a:ranked)fout<<a<<" ";
-  fout<<", S/sqrt(S+B)="<<daisy_chain.front()<<endl;
-  fout<<setw(offset+2)<<"VARIABLE |"<<setw(offset)<<"S/sqrt(S+B)"<<endl<<"----------------------------"<<endl;
-  for(int i=1;i<(int)daisy_chain.size();i++)fout<<setw(offset)<<done[ranked.size()+i-1]<<" |"<<setw(offset-3)<<daisy_chain[i]<<endl;
-  fout<<"DAISY_CHAIN: ";
-  for(auto a:done)fout<<a<<" ";
-  fout<<endl;
+  if(print){
+    fout<<"Ranking Complete.  The training path looks like:"<<endl;
+    fout<<"Began with: ";
+    for(auto a:ranked)fout<<a<<" ";
+    fout<<", S/sqrt(S+B)="<<daisy_chain.front()<<endl;
+    fout<<setw(offset+2)<<"VARIABLE |"<<setw(offset)<<"S/sqrt(S+B)"<<endl<<"----------------------------"<<endl;
+    for(int i=1;i<(int)daisy_chain.size();i++)fout<<setw(offset)<<done[ranked.size()+i-1]<<" |"<<setw(offset-3)<<daisy_chain[i]<<endl;
+    fout<<"DAISY_CHAIN: ";
+    for(auto a:done)fout<<a<<" ";
+    fout<<endl;
+  }
   produce_kfold_files(done,overwrite,trans_DF);
 }
 
 void bdt_ranker::produce_kfold_files(const vector<TString>&done,bool overwrite,int trans_DF)const{
   TCanvas *can=new TCanvas(TString(tmva_out_dir+identifier),TString(tmva_out_dir+identifier),500,300);
-  bdt_trainer even(done,overwrite,bdt_base(*this),false,2),odd(done,overwrite,bdt_base(*this),false,1);
+  bdt_trainer even(done,overwrite,bdt_base(*this),false,2);
   bdt_validate(even).print_validation_bdts(can,tmva_out_dir,-1,trans_DF,identifier+"_k-fold-even");
+  bdt_trainer odd(done,overwrite,bdt_base(*this),false,1);
   bdt_validate(odd).print_validation_bdts(can,tmva_out_dir,-1,trans_DF,identifier+"_k-fold-odd");
   delete can;
 }
 
-void bdt_ranker::rank_loop_one_var(vector<TString>&to_do,vector<TString>&done,vector<double>&daisy_chain,ofstream&fout,const string&tag,bool overwrite,int trans_DF,bool print_header)const{
+void bdt_ranker::rank_loop_one_var(vector<TString>&to_do,vector<TString>&done,vector<double>&daisy_chain,ofstream&fout,const string&tag,bool overwrite,int trans_DF,bool print_header,const map<TString,double>&buffer)const{
   string pdir=check_mkdir(tmva_out_dir+"bdt_spikes");
   TCanvas *can=new TCanvas(TString(pdir+tag),TString(pdir+tag),500,300);  int offset=20;
   map<double,TString>candidates;
-  for(auto var:to_do){
-    vector<TString>frodo(done);frodo.push_back(var);
-    candidates[bdt_validate(frodo,overwrite,(bdt_base)*this).val_sig(-1,trans_DF).second]=var;
-  }
   if(print_header){
     fout<<"Significances for ";
     for(auto a:done)fout<<a<<", ";
     fout<<"+ :"<<endl;
   }
+  fout<<"BUFFER: ";
+  for(const auto&it:buffer){
+    fout<<it.first<<","<<it.second<<" ";
+    candidates[it.second]=it.first;
+  }
+  for(auto var:to_do){
+    if(buffer.find(var)!=buffer.end())continue;
+    vector<TString>frodo(done);frodo.push_back(var);double sig=bdt_validate(frodo,overwrite,(bdt_base)*this).val_sig(-1,trans_DF).second;
+    fout<<var<<","<<sig<<" ";
+    candidates[sig]=var;
+  }
+  fout<<endl;
   ostringstream labels,values;double last_jump=0.,last_val=0.;int index=0;
   for(auto&c:candidates){
     values<<setw(offset)<<c.first;labels<<setw(offset)<<c.second;
