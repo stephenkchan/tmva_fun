@@ -96,27 +96,60 @@ void bdt_trainer::train(int bg,bool do_validation,int seed)const{
     openfiles.push_back(inputFile);
     TTree* tree = (TTree*) inputFile->Get("Nominal");
     if (tree==NULL)continue;
-    if (tree->GetEntries() == 0) continue;
+    unsigned long long nent=tree->GetEntries();
+    if (nent == 0) continue;
     silence_tree(tree);
     double event=tree->Draw("EventWeight>>hist",cut);
     TH1F *hist = (TH1F*)gDirectory->Get("hist");  event*=hist->GetMean();
     events->Fill(sam,event);
     if(debug)std::cout<<"After the tree draw "<<fileName<<" with "<<event<<" events"<<std::endl;
-    if(is_manual){
-      factory->AddTree(tree,(sam?"Background":"Signal"),(sam?backgroundWeight:signalWeight),TCut(train_cut),TMVA::Types::kTraining);
-      factory->AddTree(tree,(sam?"Background":"Signal"),(sam?backgroundWeight:signalWeight), TCut(test_cut), TMVA::Types::kTesting);
-    }
-    else{
+    if(!is_manual){
       if(sam)factory->AddBackgroundTree(tree, backgroundWeight);
       else factory->AddSignalTree(tree, signalWeight);
     }
+    else{      
+      //for k-folding, just loop through the events...hopefully this works
+      //pre selection branches
+      TBranch*bnsj,*bntg,*bevn;unsigned long long evnum;int nbtag,nsjet;
+      vector<TString> presel_floats={"pTV","mLL","dRBB","EventWeight"};
+      tree->SetBranchAddress("EventNumber",&evnum,&bevn);//ull's
+      tree->SetBranchAddress("nBTag",&nbtag,&bntg);tree->SetBranchAddress("nSigJet",&nsjet,&bnsj);
+      //content
+      map<TString,pair<float,TBranch*> > mappo;
+      for(auto var:vars)mappo[var]={0,NULL};
+      for(auto f:presel_floats)mappo[f]={0,NULL};
+      for(map<TString,pair<float,TBranch*> >::iterator it=mappo.begin(); it!=mappo.end();++it)tree->SetBranchAddress(it->first,&(it->second.first),&(it->second.second));
+
+      if(debug)cout<<"K Folidng time for nevents: "<<nent<<endl;
+      for(unsigned long long i=0;i<nent;i++){
+	bevn->GetEntry(i);bntg->GetEntry(i);bnsj->GetEntry(i);
+	for(auto mp:mappo) mp.second.second->GetEntry(i);
+	bool is_train=(int(evnum%2)==train_int);
+	if(passes_these_cuts(nbtag,nsjet,mappo["pTV"].first,mappo["mLL"].first,mappo["dRBB"].first)){
+	  float fevw=mappo["EventWeight"].first;
+	  for(auto var:vars)mappo[var].second->GetEntry(i);
+	  vector<double>vbucket;
+	  for(auto var:vars)vbucket.push_back(mappo[var].first);
+	  if(sam){
+	    if(is_train)factory->AddBackgroundTrainingEvent(vbucket,fevw);
+	    else factory->AddBackgroundTestEvent(vbucket,fevw);
+	  }
+	  else{//sam==0 is SIGNAL
+	    if(is_train)factory->AddSignalTrainingEvent(vbucket,fevw);
+	    else factory->AddSignalTestEvent(vbucket,fevw);
+	  }
+	}
+      }
+//       factory->AddTree(tree,(sam?"Background":"Signal"),(sam?backgroundWeight:signalWeight),TCut(train_cut),TMVA::Types::kTraining);
+//       factory->AddTree(tree,(sam?"Background":"Signal"),(sam?backgroundWeight:signalWeight), TCut(test_cut), TMVA::Types::kTesting);
+    }
   }
-  factory->SetWeightExpression("EventWeight");
+  if(!is_manual)factory->SetWeightExpression("EventWeight");
   TString test_train_config=(is_manual?"":"SplitMode=Alternate:NormMode=EqualNumEvents");
 //   if(seed!=0)test_train_config=Form("SplitMode=Alternate:NormMode=EqualNumEvents:SplitSeed=%i",seed);//I don't this seed means what you think it means.  If you have alternate, then this may fuck with things; so let's try and do things without
   if(debug)std::cout<<"Files read...about to prepare training and test trees"<<std::endl;
 //   outputFile->cd();
-  factory->PrepareTrainingAndTestTree(TCut(mycuts),test_train_config);
+  factory->PrepareTrainingAndTestTree((is_manual?"":TCut(mycuts)),test_train_config);
 
   if(debug)std::cout<<"Trees ready...about to book method"<<std::endl;
   // ---- Book MVA methods

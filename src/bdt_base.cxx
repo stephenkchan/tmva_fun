@@ -1,7 +1,7 @@
 #include "bdt_base.h"
 
 bdt_base::bdt_base(const string&in,const string&out,const string&tag,int nt,int nj,int eff_cut,int ratio,bool cts,int ptv,bool use_btvs,bool wmll,bool met)
-  :debug(true),tmva_in_dir(check_dir(in)),tmva_out_dir(check_mkdir(out)),identifier(tag),ntag(nt),njet(nj),beff_cut(eff_cut),charm_ratio(ratio),cts_mv2(cts),ptvbin(ptv),use_btagvs(use_btvs),widemll(wmll),metcut(met){
+  :debug(false),tmva_in_dir(check_dir(in)),tmva_out_dir(check_mkdir(out)),identifier(tag),ntag(nt),njet(nj),beff_cut(eff_cut),charm_ratio(ratio),cts_mv2(cts),ptvbin(ptv),use_btagvs(use_btvs),widemll(wmll),metcut(met){
   //akt4EM FixedCutBEff_90,85,77,70,60,50,30 (numbers are nominal tag efficiencies)
   //60,70,77,85 are supported by the tool right now
   btag_ratio_cuts={ {10,{{100,0.0}, {85,0.1758}, {77,0.6459}, {70,0.8244}, {60,0.9349}, {50,0.9769}, {30,0.9977}, {0,1.0}}},
@@ -280,6 +280,19 @@ double bdt_base::mv2c_cut(int cut,int ratio)const{
   if(btag_ratio_cuts.at(ratio).find(cut)!=btag_ratio_cuts.at(ratio).end()) return btag_ratio_cuts.at(ratio).at(cut);
 
   return -0.0436;//MV2c20 70% efficiency working point default
+}
+
+bool bdt_base::passes_cuts(int nbtag,int nsjet, float fptv, float mll,float drbb,int nt, int nj,int cut,int ratio,bool cts,int ptv,bool wmll,bool met)const{
+  if(nbtag!=2)return false;
+  if(nsjet<3&&nj>=3)return false;
+  if(ptv/1000.<200.&&drbb<=0.7)return false;
+  if(mll/1000.<(wmll?71.:83.))return false;
+  if(mll/1000.>(wmll?121.:99.))return false;
+  if(ptv==0&&fptv/1000.>=75.)return false;
+  if(ptv==1&&(fptv/1000.<75.||fptv/1000.>=150.))return false;
+  if(ptv==2&&fptv/1000.<150.)return false;
+  if(nj>=3)return nsjet>=3;
+  return nsjet==2;
 }
 
 TString bdt_base::cuts(int nt,int nj,int cut,int ratio,bool cts,int ptv,bool wmll,bool met)const{

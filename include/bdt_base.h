@@ -73,6 +73,8 @@ class bdt_base{
   pair<TH1D*,TH1D*> transformation_DF(pair<TH1D*,TH1D*>sbg,bool d,bool husk=true,double zs=4.5,double zb=4.5)const{return transformation_DF(sbg.first,sbg.second,d,husk,zs,zb);}
 
   TString these_cuts()const{return cuts(ntag,njet,beff_cut,charm_ratio,cts_mv2,ptvbin,widemll,metcut);}
+  bool passes_these_cuts(int nbtag,int nsjet, float fptv, float mll,float drbb)const{return passes_cuts(nbtag,nsjet,fptv,mll,drbb,ntag,njet,beff_cut,charm_ratio,cts_mv2,ptvbin,widemll,metcut);}
+  bool passes_cuts(int nbtag,int nsjet, float fptv, float mll,float drbb,int nt, int nj,int cut,int ratio,bool cts,int ptv,bool wmll,bool met)const;
   TString cuts(int nt,int nj,int cut,int ratio,bool cts,int ptv,bool wmll,bool met)const;
   TString btag_str()const{return "-"+btag_var()+cut_str();}
   TString btag_label()const{return btag_var()+" "+cut_label();}

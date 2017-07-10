@@ -8,7 +8,7 @@
 
 class bdt_testing: public bdt_trainer{
  public:
-  bdt_testing(const string&in,const string&out,const string&tag,const vector<TString>&vs,bool overwrite=false,int nt=2,int nj=2,int eff_cut=70,int ratio=20,bool cts=true,int lptv=2,bool wmll=true,bool met=false);
+  bdt_testing(const string&in,const string&out,const string&tag,const vector<TString>&vs,bool overwrite=false,int nt=2,int nj=2,int eff_cut=70,int ratio=20,bool cts=true,int lptv=2,bool btv=true,bool wmll=true,bool met=false);
   bdt_testing(const vector<TString>&vs,bool overwrite,const bdt_base&base);
   bdt_testing(const bdt_trainer&train);
   pair<double,double> test_sig(int bg=-1,int trans_DF=0){return optimal_sig(make_testing_bdt_dists(bg,trans_DF));}

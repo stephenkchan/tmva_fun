@@ -1,6 +1,6 @@
 #include "bdt_testing.h"
-bdt_testing::bdt_testing(const string&in,const string&out,const string&tag,const vector<TString>&vs,bool overwrite,int nt,int nj,int eff_cut,int ratio,bool cts,int lptv,bool wmll,bool met):
-  bdt_trainer(in,out,tag,vs,overwrite,nt,nj,eff_cut,ratio,cts,lptv,wmll,met){}
+bdt_testing::bdt_testing(const string&in,const string&out,const string&tag,const vector<TString>&vs,bool overwrite,int nt,int nj,int eff_cut,int ratio,bool cts,int lptv,bool btv,bool wmll,bool met):
+  bdt_trainer(in,out,tag,vs,overwrite,nt,nj,eff_cut,ratio,cts,lptv,btv,wmll,met){}
 
 bdt_testing::bdt_testing(const vector<TString>&vs,bool overwrite,const bdt_base&base):
   bdt_trainer(vs,overwrite,base){}

@@ -13,7 +13,7 @@ vector<double> bdt_ranker::ranking_front_matter(const string&tag,bool overwrite,
   vector<TString> done(ranked),to_do(unranked);  bdt_validate starter(done,overwrite,(bdt_base)*this);
   vector<double>daisy_chain(1,starter.val_sig(-1,trans_DF).second);
   ostringstream samples,events; pair<double,double>master=starter.evts_S_B(-1);samples<<setw(20)<<"ZHll125"<<setw(20)<<" TOTAL_BG";events<<setw(20)<<master.first<<setw(20)<<master.second;
-  for(auto i:{2,4,5,6}){samples<<setw(20)<<sam_label(i);events<<setw(20)<<starter.evts_S_B(i).second;}
+  for(auto i:{2,3,4,5,6}){samples<<setw(20)<<sam_label(i);events<<setw(20)<<starter.evts_S_B(i).second;}
   ofstream fout(log().c_str());
   fout<<"START BDT ranking of type: "<<identifier<<setprecision(5)<<endl;
   fout<<">-----------------------------------EVENT COUNTS-----------------------------------------------<"<<endl;
@@ -112,12 +112,16 @@ void bdt_ranker::finish_ranking(const string&tag,bool overwrite,int trans_DF){
 void bdt_ranker::ranking_back_matter(const vector<TString>&done,const vector<double>&daisy_chain,ofstream&fout,bool overwrite,int trans_DF,bool print)const{
   int offset=20;
   if(print){
+    //okay, so you don't always start ranking with just one variable
+    //when looping through daisy chain (which is the whole shtick),
+    //you need to start at an index = ranked.size()-1 (ranked is just the starting set)
+    int startdex=ranked.size()-1;
     fout<<"Ranking Complete.  The training path looks like:"<<endl;
     fout<<"Began with: ";
     for(auto a:ranked)fout<<a<<" ";
-    fout<<", S/sqrt(S+B)="<<daisy_chain.front()<<endl;
+    fout<<", S/sqrt(S+B)="<<daisy_chain[startdex]<<endl;
     fout<<setw(offset+2)<<"VARIABLE |"<<setw(offset)<<"S/sqrt(S+B)"<<endl<<"----------------------------"<<endl;
-    for(int i=1;i<(int)daisy_chain.size();i++)fout<<setw(offset)<<done[ranked.size()+i-1]<<" |"<<setw(offset-3)<<daisy_chain[i]<<endl;
+    for(int i=startdex+1;i<(int)daisy_chain.size();i++)fout<<setw(offset)<<done[i]<<" |"<<setw(offset-3)<<daisy_chain[i]<<endl;
     fout<<"DAISY_CHAIN: ";
     for(auto a:done)fout<<a<<" ";
     fout<<endl;
@@ -128,9 +132,9 @@ void bdt_ranker::ranking_back_matter(const vector<TString>&done,const vector<dou
 void bdt_ranker::produce_kfold_files(const vector<TString>&done,bool overwrite,int trans_DF)const{
   TCanvas *can=new TCanvas(TString(tmva_out_dir+identifier),TString(tmva_out_dir+identifier),500,300);
   bdt_trainer even(done,overwrite,bdt_base(*this),false,2);
-  bdt_validate(even).print_validation_bdts(can,tmva_out_dir,-1,trans_DF,identifier+"_k-fold-even");
+  bdt_validate(even).print_validation_bdts(can,tmva_out_dir,-1,0,identifier+"_k-fold-even");
   bdt_trainer odd(done,overwrite,bdt_base(*this),false,1);
-  bdt_validate(odd).print_validation_bdts(can,tmva_out_dir,-1,trans_DF,identifier+"_k-fold-odd");
+  bdt_validate(odd).print_validation_bdts(can,tmva_out_dir,-1,0,identifier+"_k-fold-odd");
   delete can;
 }
 
