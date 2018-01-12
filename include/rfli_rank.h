@@ -21,7 +21,7 @@ class rfli_rank : public bdt_ranker{
 
   vector<int>jets()const{return{2,3};}
   vector<int>ptvs()const{return{1,2};}//here, it's "reasonable" bins; lo ptv isn't useful evidently
-  vector<int>cases()const{return{0,1,3,8};}//cut,std,li-met,rf-sel
+  vector<int>cases()const{return{9,3,8};}//std-kf,li-met,rf-sel
   int which;
 };
 

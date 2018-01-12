@@ -94,7 +94,7 @@ bool bdt_testing::passes_cut(const map<TString,pair<float,TBranch*> >& vars,int 
   if(ptv>75. && ptvbin==0)return false;//(0,75] GeV
   if((ptv<=75.||ptv>150.) && ptvbin==1)return false;//(75,150] GeV
   if(ptv<=150. && ptvbin==2)return false;//(150,\infty) GeV
-  if(vars.at("mLL").first/1000.<=60 || vars.at("mLL").first/1000.>=110.)return false;
+  if(vars.at("mLL").first/1000.<=81 || vars.at("mLL").first/1000.>=101.)return false;
   return true;
 }
 

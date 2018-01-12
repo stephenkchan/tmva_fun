@@ -131,9 +131,11 @@ void bdt_ranker::ranking_back_matter(const vector<TString>&done,const vector<dou
 
 void bdt_ranker::produce_kfold_files(const vector<TString>&done,bool overwrite,int trans_DF)const{
   TCanvas *can=new TCanvas(TString(tmva_out_dir+identifier),TString(tmva_out_dir+identifier),500,300);
-  bdt_trainer even(done,overwrite,bdt_base(*this),false,2);
+  bdt_trainer evendb(done,overwrite,bdt_base(*this),false,2,true);
+  bdt_trainer odddb(done,overwrite,bdt_base(*this),false,1,true);
+  bdt_trainer even(done,overwrite,bdt_base(*this),false,2,false);
   bdt_validate(even).print_validation_bdts(can,tmva_out_dir,-1,0,identifier+"_k-fold-even");
-  bdt_trainer odd(done,overwrite,bdt_base(*this),false,1);
+  bdt_trainer odd(done,overwrite,bdt_base(*this),false,1,false);
   bdt_validate(odd).print_validation_bdts(can,tmva_out_dir,-1,0,identifier+"_k-fold-odd");
   delete can;
 }

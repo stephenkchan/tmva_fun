@@ -26,17 +26,18 @@ bool bdt_base::process_sample(int bg,int sam)const{
 }
 
 int bdt_base::which_sam(TString sam)const{
-  TPRegexp signal(".*[WZ]H.*125.*.root"),zjets(".*Z(ee|mumu|tautau)(B|C|L).*.root"),wjets(".*W(en|munu|taunu)(B|C|L).*.root"),diboson(".*[WZ][WZ].*.root");
-  TObjArray *zj=zjets.MatchS(sam),*dbo=diboson.MatchS(sam),*zh125=signal.MatchS(sam),*wje=wjets.MatchS(sam);
+  TPRegexp signal(".*[WZ]H.*125.*.root"),zjets(".*Z(ee|mumu|tautau)(B|C|L).*.root"),wjets(".*W(en|munu|taunu)(B|C|L).*.root"),diboson(".*[WZ][WZ].*.root"),zzdiboson(".*ZZ.*.root");
+  TObjArray *zj=zjets.MatchS(sam),*dbo=diboson.MatchS(sam),*zh125=signal.MatchS(sam),*wje=wjets.MatchS(sam),*zzdb=zzdiboson.MatchS(sam);
   bool zh=zh125->GetEntries()>0,zlep=zj->GetEntries()==3,db=dbo->GetEntries()>0,zb=false,zc=false,zl=false,tt=sam.Contains("ttbar");
   if(zlep){
     TString flavor(zj->At(2)->GetName());
     zb = flavor=="B";zc = flavor=="C";zl = flavor=="L";
   }
-  bool singletop=sam.Contains("stop"),mj=sam.Contains("multijet"),wj=wje->GetEntries()>0;
+  bool singletop=sam.Contains("stop"),mj=sam.Contains("multijet"),wj=wje->GetEntries()>0,zz=zzdb->GetEntries()>0;
   bool ancillary=singletop||mj||wj;
   if(zh)return 0;
 //   if(zl||zc||zb)return 1;
+  if(zz)return 100;
   if(tt)return 2;
   if(db)return 3;
   if(zl)return 4;
@@ -45,11 +46,12 @@ int bdt_base::which_sam(TString sam)const{
   if(ancillary)return 7;
   return -99;
 }
+
 TString bdt_base::sam_tag(int sam)const{
   if(sam==0)return "-zh125";
   if(sam==1)return "-zjets";
   if(sam==2)return "-ttbar";
-  if(sam==3)return "-db";
+  if(sam==3||sam==100)return "-db";
   if(sam==4)return "-zl";
   if(sam==5)return "-zc";
   if(sam==6)return "-zb";
@@ -60,23 +62,37 @@ TString bdt_base::sam_label(int sam)const{
   if(sam==0)return "ZH125";
   if(sam==1)return "Z+jets";
   if(sam==2)return "t#bar{t}";
-  if(sam==3)return "diboson";
+  if(sam==3||sam==100)return "diboson";
   if(sam==4)return "Zl";
   if(sam==5)return "Zc";
   if(sam==6)return "Zb";
   if(sam==7)return "other";
-  return "Z+jets, t#bar{t}";
+  return "Z+j, t#bar{t}, VV";
 }
 pair<double,double> bdt_base::cumulat_sig(TH1D*sig,TH1D*big)const{
-  double ssb=0.;int nbins=sig->GetNbinsX();
+  double ssb=0.,errsqrd=0.;int nbins=sig->GetNbinsX();
   if(nbins!=big->GetNbinsX())return pair<double,double>(-99.,0.);
   for(int i=1;i<=nbins;i++){
-    double S=sig->GetBinContent(i),B=big->GetBinContent(i);
+    double S=sig->GetBinContent(i),B=big->GetBinContent(i),errS=(S<=0?0:sig->GetBinError(i)),errB=(B<=0?0:big->GetBinError(i)),dfds=dfds_ssb(S,B),dfdb=dfdb_ssb(S,B),errcand=(dfds*errS*errS+dfdb*errB*errB);
     if(B<=0)B=1.e-6;
     ssb+=S/sqrt(S+B);
+    errsqrd += (isfinite(errcand)?errcand:0);
+//     cout<<S<<" "<<B<<" "<<errS<<" "<<errB<<" "<<dfds<<" "<<errcand<<endl;
   }
-  return {-999999.,ssb};
+  return {sqrt(errsqrd),ssb};
 }
+
+double bdt_base::dfds_ssb(double si,double bi)const{
+  double s=(si<=0||!isfinite(si)?0:si),b=(bi<=0||!isfinite(bi)?0:bi);
+  double den = pow(s+b,3), num = 0.5*s+b;
+  return num*num/den;
+}
+double bdt_base::dfdb_ssb(double si,double bi)const{
+  double s=(si<=0||!isfinite(si)?0:si),b=(bi<=0||!isfinite(bi)?0:bi);
+  double den = pow(s+b,3);
+  return 0.25*s/den;
+}
+
 pair<double,double> bdt_base::optimal_sig(TH1D*sig,TH1D*big,bool simple)const{
   vector<double>sigs;int nbins=sig->GetNbinsX();
   if(nbins!=big->GetNbinsX())return pair<double,double>(-99.,0.);
@@ -169,12 +185,12 @@ pair<TH1D*,TH1D*> bdt_base::transformation_DF(TH1D*sig,TH1D*big,bool husk,bool d
   return pair<TH1D*,TH1D*>(patrick,jane);
 }
 
-void bdt_base::print_info_plot_2d(const vector<vector<double> >&info,const vector<TString>&xlabels,const vector<TString>&ylabels,const TString&name,const TString&pdir,const TString&title)const{
+void bdt_base::print_info_plot_2d(const vector<vector<double> >&info,const vector<TString>&xlabels,const vector<TString>&ylabels,const TString&name,const TString&pdir,const TString&title,const vector<vector<double> >&errors)const{
   if(info.size()!=xlabels.size())return;
   if(ylabels.empty())return;
   if(info.front().size()!=ylabels.size())return;
-  TStyle*style=set_style();  style->SetPadRightMargin(0.075);style->cd();TString doy=check_mkdir(pdir)+name+".pdf";
-  TCanvas*c=new TCanvas(doy,doy,100*xlabels.size(),100*ylabels.size());c->cd();
+  TStyle*style=set_style();  style->SetPadRightMargin(0.075);style->cd();TString doy=check_mkdir(pdir)+name+".pdf",drawopt="coltextz";
+  TCanvas*c=new TCanvas(doy,doy,100*xlabels.size()+50,100*ylabels.size());c->cd();
   TH2D*compendium=new TH2D(name,name,xlabels.size(),-0.5,xlabels.size()-0.5,ylabels.size(),-0.5,ylabels.size()-0.5);
   compendium->GetXaxis()->SetLabelSize(0.035);  compendium->GetYaxis()->SetLabelSize(0.035);//  compendium->GetZaxis()->SetLabelSize(0.035);
   for(int x=0;x<(int)xlabels.size();x++)compendium->GetXaxis()->SetBinLabel(x+1,xlabels[x]);
@@ -182,7 +198,14 @@ void bdt_base::print_info_plot_2d(const vector<vector<double> >&info,const vecto
   for(int x=0;x<(int)xlabels.size();x++){
     for(int y=0;y<(int)ylabels.size();y++)compendium->Fill(x,y,info[x][y]);
   }
-  compendium->Draw("coltextz");
+  if(info.size()==errors.size() && info.front().size()==errors.front().size()){//if the error information is there, add it
+    drawopt="coltextez";
+    for(int x=0;x<(int)xlabels.size();x++){
+      for(int y=0;y<(int)ylabels.size();y++)compendium->SetBinError(x+1,y+1,errors[x][y]);
+    }
+  }
+
+  compendium->Draw(drawopt);
   TLatex l=plot_latex();l.SetTextSize(0.03);
   l.DrawLatex(0.08,0.95,title);
   c->Print(doy);
@@ -223,7 +246,7 @@ TString bdt_base::ptv_str(int ptv)const{
 }
 TString bdt_base::ptv_label(int ptv)const{
   if(ptv==0)return "p_{T}^{V}<75 GeV";
-  else if(ptv==1)return "75GeV<p_{T}^{V}<150 GeV";
+  else if(ptv==1)return "75 GeV<p_{T}^{V}<150 GeV";
   else if(ptv==2)return "p_{T}^{V}>150 GeV";
   return "all p_{T}^{V}";
 }
@@ -286,8 +309,8 @@ bool bdt_base::passes_cuts(int nbtag,int nsjet, float fptv, float mll,float drbb
   if(nbtag!=2)return false;
   if(nsjet<3&&nj>=3)return false;
   if(ptv/1000.<200.&&drbb<=0.7)return false;
-  if(mll/1000.<(wmll?71.:83.))return false;
-  if(mll/1000.>(wmll?121.:99.))return false;
+  if(mll/1000.<(wmll?71.:81.))return false;//was 83
+  if(mll/1000.>(wmll?121.:101.))return false;//was 99
   if(ptv==0&&fptv/1000.>=75.)return false;
   if(ptv==1&&(fptv/1000.<75.||fptv/1000.>=150.))return false;
   if(ptv==2&&fptv/1000.<150.)return false;
@@ -298,22 +321,22 @@ bool bdt_base::passes_cuts(int nbtag,int nsjet, float fptv, float mll,float drbb
 TString bdt_base::cuts(int nt,int nj,int cut,int ratio,bool cts,int ptv,bool wmll,bool met)const{
   double bcut=mv2c_cut(cut,ratio);TString var=btag_var(ratio,cts),b1=var+"B1",b2=var+"B2";
   ostringstream cuts;
-  //common dR cut
-  cuts<<"(pTV/1000.>=200 || (pTV/1000.<200&&dRBB>0.7))";
+  //common dR cut--NOT ANYMORE EPS 2017
+//   cuts<<"(pTV/1000.>=200 || (pTV/1000.<200&&dRBB>0.7))";
 
   //pTV cut
-  if(ptv==0)cuts<<"&& pTV / 1000. < 75";
-  else if(ptv==1) cuts<<"&& pTV / 1000. >= 75 && pTV / 1000. < 150";
-  else if(ptv==2) cuts<<"&& pTV / 1000. >= 150";
+  if(ptv==0)cuts<<"pTV / 1000. < 75";
+  else if(ptv==1) cuts<<"pTV / 1000. >= 75 && pTV / 1000. < 150";
+  else if(ptv==2) cuts<<"pTV / 1000. >= 150";
   //default is inclusive
 
   //mLL cut
   if(wmll)cuts<<" && mLL / 1000. > 71 && mLL / 1000. < 121.";
-  else cuts<<" && mLL / 1000. > 83 && mLL / 1000. < 99.";
+  else cuts<<" && mLL / 1000. > 81 && mLL / 1000. < 101.";
 
   //njet cut
   if(nj>=3)cuts<<" && nSigJet>=3";
-  else if(nj==-99)cuts<<" && nSigJet>=2";
+  else if(nj==-99)cuts<<" && nSigJet>=2"; //these were SigJet
   else cuts<<" && nSigJet==2";
 
   //btag cut
@@ -374,7 +397,7 @@ TStyle* bdt_base::set_style() const{
   TStyle *style = AtlasStyle();//new TStyle("Plain","");
   style->SetNumberContours(100); 
   style->SetPadRightMargin(0.075);
-  style->SetPadLeftMargin(0.10);
+  style->SetPadLeftMargin(0.15);
   style->SetPadTopMargin(0.075);
   style->SetPadBottomMargin(0.11);
   int n_pts=11;

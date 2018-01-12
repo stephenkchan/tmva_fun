@@ -11,8 +11,8 @@ using namespace TMVA;
 
 class bdt_trainer : public bdt_base{
  public:
-  bdt_trainer(const string&in,const string&out,const string&tag,const vector<TString>&vs,bool overwrite,int nt=2,int nj=2,int eff_cut=70,int ratio=20,bool cts=true,int lptv=1,bool btv=true,bool wmll=true,bool met=false,bool do_validation=true,int seed=0);
-  bdt_trainer(const vector<TString>&vs,bool overwrite,const bdt_base&base,bool do_validation=true,int seed=0);
+  bdt_trainer(const string&in,const string&out,const string&tag,const vector<TString>&vs,bool overwrite,int nt=2,int nj=2,int eff_cut=70,int ratio=20,bool cts=true,int lptv=1,bool btv=true,bool wmll=true,bool met=false,bool do_validation=true,int seed=0,bool _isdb=false);
+  bdt_trainer(const vector<TString>&vs,bool overwrite,const bdt_base&base,bool do_validation=true,int seed=0,bool _isdb=false);
   ~bdt_trainer();
   void train(int bg=-99)const{train(bg,validate,kseed);}
   pair<double,double> significance();
@@ -24,11 +24,12 @@ class bdt_trainer : public bdt_base{
  protected:
 
   //
+  bool is_signal(int sam)const;
   void train(int bg,bool do_validation,int seed)const;
   void silence_tree(TTree*tree)const;
   TString root_file(int bg,bool do_validation,int seed)const{return (is_standard(do_validation,seed)?filename(vars,bg):production_filename(bg));}
   TString root_file(int bg=-1)const{return root_file(bg,validate,kseed);}
-  void initialize(bool overwrite,bool do_validation,int seed);
+  void initialize(bool overwrite,bool do_validation,int seed,bool db);
   bool is_standard(bool do_validation,int seed)const{return do_validation && seed==0;}
   TString xml_tag(bool do_validation,int seed,bool split=true)const{return (is_standard(do_validation,seed)?"TMVAClassification"+ftag(vars,split):production_tag());}
   TString xml_file(bool do_validation,int seed,bool split=true)const{return xml_tag(do_validation,seed,split)+"_BDT.weights.xml";}
@@ -46,7 +47,7 @@ class bdt_trainer : public bdt_base{
   //this means no holdout method, just TMVA's testing and training---we do this to harmonize
   //and boost statistics for final results; the kseed is the seed for training, hopefully k-folds into
   //even/odd
-  bool validate;int kseed;
+  bool validate;int kseed;bool isdb;
 
   //configuration parameters
   vector<TFile*>opfiles;

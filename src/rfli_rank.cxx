@@ -1,7 +1,9 @@
 #include "rfli_rank.h"
 
 rfli_rank::rfli_rank(const string&in,const string&out,int ptv,int nj,bool btvs,int whic)
-  :bdt_ranker(in,out,vector<TString>(),vector<TString>(),2,nj,70,10,false,ptv,btvs),which(whic){set_vars(whic);}
+  :bdt_ranker(in,out,vector<TString>(),vector<TString>(),2,nj,70,10,false,ptv,btvs,false,false),which(whic){set_vars(whic);}
+//the hard-coded arguments are: 2 b-tags, 70% b-tag eff WP, MV2c10, no psuedo-continuous tagging, no wide mll cut, no MET cut
+//(EPS 2017 settings)
 
 void rfli_rank::all_ranks(bool overwrite,int tDF){
   for(auto nj:jets()){
@@ -29,6 +31,7 @@ pair<vector<TString>,vector<TString> > rfli_rank::vars(int whic)const{
   if(whic<=0)return{base,unranked};//cut-based
   else if(whic==2||whic==3)base=vector<TString>{"j0_j1"};
   else if(whic<9&&whic>3)base=vector<TString>{"MH"};
+  else if(whic==9)base=vector<TString>{"mBBkf","dRBB"};
   else if(whic==99)return pair<vector<TString>,vector<TString> >(vector<TString>{"MH"},vector<TString>{"MCM","MZ"});
   else if(whic!=1){
     cerr<<"You have specified a bad which "<<which<<endl;
@@ -40,7 +43,9 @@ pair<vector<TString>,vector<TString> > rfli_rank::vars(int whic)const{
     if(beff_cut>60)unranked={bv+"B1",bv+"B2"};
     if(njet>2&&beff_cut<85)unranked.push_back(bv+"J3");
   }
-  vector<TString> std={"pTV","dPhiVBB","dEtaVBB","mLL","MET"};
+  vector<TString> std={"pTV","dPhiVBB","dEtaVBB","MET"};
+  if(whic==9)std.push_back("mLLkf");
+  else std.push_back("mLL");
 //   if(use_btagvs||always_tag){
   std.push_back("pTB1");std.push_back("pTB2");
   if(njet>2){
@@ -49,7 +54,7 @@ pair<vector<TString>,vector<TString> > rfli_rank::vars(int whic)const{
   }
   vector<TString> li={"j0_l0", "j0_l1", "j1_l0", "j1_l1", "l0_l1", "angle_bbz_bbll","angle_bb_z","gamma_ZHz"},li_met={"MET"},rf={"MCM","MZ","cosCM","cosZ","cosH","Rpt","Rpz"},rf_met={"Rmet","dphiCMMet"},rfdp={"dphiLABCM","dphiCMZ","dphiCMH"},rf_select={"Rmet","dphiCMH"};
   
-  if(whic==1)unranked.insert(unranked.end(),std.begin(),std.end());
+  if(whic==1||whic==9)unranked.insert(unranked.end(),std.begin(),std.end());
   else if(whic<=3){//LI's
     unranked.insert(unranked.end(),li.begin(),li.end());
     if(whic==3)unranked.insert(unranked.end(),li_met.begin(),li_met.end());
@@ -73,6 +78,7 @@ string rfli_rank::var_tag(int whic)const{
   else if(whic==6)varset="rfdp";
   else if(whic==7)varset="rfdp-met";
   else if(whic==8)varset="rf-sel";
+  else if(whic==9)varset="std-kf";
   else if(whic==99)varset="test";
   varset+=(use_btagvs?"-pct":"");
   return varset;

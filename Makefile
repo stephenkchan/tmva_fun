@@ -26,7 +26,10 @@ $(ODIR)/%.o: $$(SDIR)/%.$1 $$(DEPS)
 endef
 $(foreach EXT,$(SRC_EXT),$(eval $(call comp_objects,$(EXT))))
 
-all: plot_rfli fin_rfli train_rfli rfli_single
+all: plot_rfli fin_rfli train_rfli rfli_single rfli_test
+
+rfli_test: $(PDIR)/rfli_test.cxx $(OGCM) $(CMNOBJ)
+	$(CC) -o $(EDIR)/$@ $^ $(LIBS) 
 
 plot_rfli: $(PDIR)/plot_rfli.cxx $(OGCM) $(CMNOBJ)
 	$(CC) -o $(EDIR)/$@ $^ $(LIBS) 

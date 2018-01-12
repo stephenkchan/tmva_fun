@@ -58,7 +58,7 @@ class bdt_base{
   TString sam_label(int sam)const;
   int sam_min()const{return 0;}
   int n_sam()const{return 8;}
-  void print_info_plot_2d(const vector<vector<double> >&info,const vector<TString>&xlabels,const vector<TString>&ylabels,const TString&name,const TString&pdir,const TString&title)const;
+  void print_info_plot_2d(const vector<vector<double> >&info,const vector<TString>&xlabels,const vector<TString>&ylabels,const TString&name,const TString&pdir,const TString&title,const vector<vector<double> >&errors=vector<vector<double> >())const;
   void set_tag(const string&tag){identifier=tag;}
   string get_identifier()const{return identifier;}
   TString filename(const vector<TString>&vars,int bg=-1)const{return tmva_out_dir+"TMVA"+sam_tag(bg==0?-1:bg)+ftag(vars)+".root";}
@@ -71,6 +71,10 @@ class bdt_base{
   bool process_sample(int bg,int sam)const;
   pair<TH1D*,TH1D*> transformation_DF(TH1D*sig,TH1D*big,bool d,bool husk=true,double zs=4.5,double zb=4.5)const;
   pair<TH1D*,TH1D*> transformation_DF(pair<TH1D*,TH1D*>sbg,bool d,bool husk=true,double zs=4.5,double zb=4.5)const{return transformation_DF(sbg.first,sbg.second,d,husk,zs,zb);}
+
+  double dfds_ssb(double si,double bi)const;
+  double dfdb_ssb(double si,double bi)const;
+
 
   TString these_cuts()const{return cuts(ntag,njet,beff_cut,charm_ratio,cts_mv2,ptvbin,widemll,metcut);}
   bool passes_these_cuts(int nbtag,int nsjet, float fptv, float mll,float drbb)const{return passes_cuts(nbtag,nsjet,fptv,mll,drbb,ntag,njet,beff_cut,charm_ratio,cts_mv2,ptvbin,widemll,metcut);}

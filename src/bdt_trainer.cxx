@@ -1,12 +1,16 @@
 #include "bdt_trainer.h"
 
-bdt_trainer::bdt_trainer(const string&in,const string&out,const string&tag,const vector<TString>&vs,bool overwrite,int nt,int nj,int eff_cut,int ratio,bool cts,int lptv,bool btv,bool wmll,bool met,bool do_validation,int seed)
-  :bdt_base(in,out,tag,nt,nj,eff_cut,ratio,cts,lptv,btv,wmll,met),vars(vs),validate(do_validation),kseed(seed){initialize(overwrite,do_validation,seed);}
+bdt_trainer::bdt_trainer(const string&in,const string&out,const string&tag,const vector<TString>&vs,bool overwrite,int nt,int nj,int eff_cut,int ratio,bool cts,int lptv,bool btv,bool wmll,bool met,bool do_validation,int seed,bool _isdb)
+  :bdt_base(in,out,tag,nt,nj,eff_cut,ratio,cts,lptv,btv,wmll,met),vars(vs),validate(do_validation),kseed(seed),isdb(_isdb){initialize(overwrite,do_validation,seed,_isdb);}
 
-bdt_trainer::bdt_trainer(const vector<TString>&vs,bool overwrite,const bdt_base&base,bool do_validation,int seed)
-  :bdt_base(base),vars(vs),validate(do_validation),kseed(seed){initialize(overwrite,do_validation,seed);}
+bdt_trainer::bdt_trainer(const vector<TString>&vs,bool overwrite,const bdt_base&base,bool do_validation,int seed,bool _isdb)
+  :bdt_base(base),vars(vs),validate(do_validation),kseed(seed),isdb(_isdb){initialize(overwrite,do_validation,seed,_isdb);}
 
-void bdt_trainer::initialize(bool overwrite,bool do_validation,int seed){
+void bdt_trainer::initialize(bool overwrite,bool do_validation,int seed,bool db){
+  if(db){
+    std::cout<<"Doing a DIBOSON training."<<std::endl;
+    identifier+="-db";
+  }
   if(opendir(tmva_in_dir.c_str())==NULL){
     cout<<"TMVA data dir "<<tmva_in_dir<<" does not exist. Exiting..."<<endl;
     exit(2);
@@ -24,6 +28,11 @@ pair<double,double> bdt_trainer::significance(){
     cerr<<"train std: "<<optimal_sig(start).second<<" t_F: "<<optimal_sig(powerup).second<<" t_D: "<<optimal_sig(powedup).second<<endl;
   }
   return optimal_sig(start);
+}
+
+bool bdt_trainer::is_signal(int sam)const{
+  if(isdb) return sam==100;
+  return sam==0;
 }
 
 void bdt_trainer::bdt_dists(bool overwrite,bool do_validation,int seed,int bg){
@@ -49,7 +58,7 @@ pair<double,double> bdt_trainer::evts_S_B(int bg)const{
   TFile*f=TFile::Open(root_file());
   if(!f)f=TFile::Open(root_file(bg));
   TH1D*events=(TH1D*)f->Get("events");
-  double sigev=events->GetBinContent(1),bigev;
+  double sigev=events->GetBinContent(isdb?3:1),bigev;
   if(bg==1)bigev=events->GetBinContent(4+1,-1);//Z+jets; back entries starting at 4
   else if(is_single_bg(bg))bigev=events->GetBinContent(bg+1);//single backgrounds
   else bigev=events->Integral(2,-1);//all background
@@ -102,10 +111,10 @@ void bdt_trainer::train(int bg,bool do_validation,int seed)const{
     double event=tree->Draw("EventWeight>>hist",cut);
     TH1F *hist = (TH1F*)gDirectory->Get("hist");  event*=hist->GetMean();
     events->Fill(sam,event);
-    if(debug)std::cout<<"After the tree draw "<<fileName<<" with "<<event<<" events"<<std::endl;
+    if(debug)std::cout<<"After the "<<(is_signal(sam)?"SIG":"BG")<<" tree draw "<<fileName<<" with "<<event<<" events"<<std::endl;
     if(!is_manual){
-      if(sam)factory->AddBackgroundTree(tree, backgroundWeight);
-      else factory->AddSignalTree(tree, signalWeight);
+      if(is_signal(sam)) factory->AddSignalTree(tree, signalWeight);
+      else factory->AddBackgroundTree(tree, backgroundWeight);
     }
     else{      
       //for k-folding, just loop through the events...hopefully this works
@@ -130,13 +139,13 @@ void bdt_trainer::train(int bg,bool do_validation,int seed)const{
 	  for(auto var:vars)mappo[var].second->GetEntry(i);
 	  vector<double>vbucket;
 	  for(auto var:vars)vbucket.push_back(mappo[var].first);
-	  if(sam){
-	    if(is_train)factory->AddBackgroundTrainingEvent(vbucket,fevw);
-	    else factory->AddBackgroundTestEvent(vbucket,fevw);
-	  }
-	  else{//sam==0 is SIGNAL
+	  if(is_signal(sam)){
 	    if(is_train)factory->AddSignalTrainingEvent(vbucket,fevw);
 	    else factory->AddSignalTestEvent(vbucket,fevw);
+	  }
+	  else{
+	    if(is_train)factory->AddBackgroundTrainingEvent(vbucket,fevw);
+	    else factory->AddBackgroundTestEvent(vbucket,fevw);
 	  }
 	}
       }
@@ -153,7 +162,10 @@ void bdt_trainer::train(int bg,bool do_validation,int seed)const{
 
   if(debug)std::cout<<"Trees ready...about to book method"<<std::endl;
   // ---- Book MVA methods
-  factory->BookMethod( TMVA::Types::kBDT,"BDT","!H:!V:NTrees=200:MaxDepth=4:BoostType=AdaBoost:AdaBoostBeta=0.15:SeparationType=GiniIndex:nCuts=100:PruneMethod=NoPruning:MinNodeSize=1.5%" );
+  TString method_specs="!H:!V:NTrees=200:MaxDepth=4:BoostType=AdaBoost:AdaBoostBeta=0.15:SeparationType=GiniIndex:nCuts=100:PruneMethod=NoPruning:MinNodeSize=1.5%";//legacy settings
+  method_specs="!H:!V:BoostType=AdaBoost:AdaBoostBeta=0.15:SeparationType=GiniIndex:PruneMethod=NoPruning:NTrees=200:MaxDepth=4:nCuts=100:nEventsMin=5%";
+  factory->BookMethod( TMVA::Types::kBDT,"BDT",method_specs);
+  
   if(debug)std::cout<<"Method booked...about to train"<<std::endl;
   // ---- Now you can tell the factory to train, test, and evaluate the MVAs
   factory->TrainAllMethods();
@@ -185,6 +197,7 @@ pair<double,double> bdt_trainer::print_bdt_plots(TCanvas *c,pair<TH1D*,TH1D*>iri
   pair<TH1D*,TH1D*> bleuet={(TH1D*)start.first->Clone(),(TH1D*)start.second->Clone()};
   bool printcut=(scut>=iris.first->GetXaxis()->GetXmin()&&scut<=iris.first->GetXaxis()->GetXmax());
   pair<double,double>hyacinth=(printcut?cut_sig(iris,scut):cumulat_sig(iris));
+  double NS=iris.first->Integral(),NB=iris.second->Integral();
   int bone=12,sone=8,btwo=0,stwo=20;
   bleuet.first->Scale(1./bleuet.first->Integral());
   bleuet.second->Scale(1./bleuet.second->Integral());
@@ -209,9 +222,9 @@ pair<double,double> bdt_trainer::print_bdt_plots(TCanvas *c,pair<TH1D*,TH1D*>iri
   }
   iris.first->SetFillColorAlpha(color(sone),0.75);
 //   iris.first->SetFillColor(color(sone));
-  iris.first->SetLineColor(kBlack);iris.first->Draw("hist same");
+  iris.first->SetLineColor(kBlack);iris.first->SetMarkerStyle(1);iris.first->Draw("hist e same");
   iris.second->SetFillColorAlpha(color(bone),0.75);
-  iris.second->SetLineColor(kBlack);iris.second->Draw("hist same");
+  iris.second->SetLineColor(kBlack);iris.second->SetMarkerStyle(1);iris.second->Draw("hist e same");
   double lo=style->GetPadLeftMargin(),hi=1.-style->GetPadRightMargin();
   double xmin=iris.first->GetXaxis()->GetXmin(),xmax=iris.first->GetXaxis()->GetXmax(),cut_val=printcut?hyacinth.first:0.35,line_x=lo+(hi-lo)*(cut_val-xmin)/(xmax-xmin);
   if(printcut){
@@ -221,11 +234,14 @@ pair<double,double> bdt_trainer::print_bdt_plots(TCanvas *c,pair<TH1D*,TH1D*>iri
   TLatex l=plot_latex();l.SetTextSize(0.05);double flip_flop=0.67,cut_x=(line_x<flip_flop?line_x+0.01:line_x-0.35),bg_x=(line_x<flip_flop?line_x+0.06:line_x-0.15),bg_x_long=(line_x<flip_flop?line_x+0.01:line_x-0.30);
   if(bglabel.Length()<1.05*tag.Length() && bglabel.Length()>0.5*tag.Length())bg_x=cut_x;
   else if(bglabel.Length()>1.05*tag.Length())bg_x=bg_x_long;
-  ostringstream cut;
+  ostringstream cut,nsnb;
+  bg_x=0.50;cut_x=0.50;
   if(printcut)cut<<"Cut="<<setprecision(3)<<cut_val<<", sig="<<hyacinth.second<<(funky_style?" (VAL)":" (TEST)");
   else cut<<"Sig="<<hyacinth.second<<(funky_style?" (VAL)":" (TEST)");
+  nsnb<<"N_{S}="<<NS<<", N_{B}=" <<NB;
   l.DrawLatex(cut_x,0.8,cut.str().c_str());
   l.DrawLatex(bg_x,0.74,bglabel);
+  l.DrawLatex(bg_x,0.68,nsnb.str().c_str());
   if(iris.first->GetNbinsX()==bleuet.first->GetNbinsX()){
     double kolS=iris.first->KolmogorovTest(bleuet.first),kolB=iris.second->KolmogorovTest(bleuet.second);
     TString probatext = Form( "Kolmogorov-Smirnov test: signal (background) probability = %5.3g (%5.3g)", kolS, kolB );

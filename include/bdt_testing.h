@@ -16,7 +16,7 @@ class bdt_testing: public bdt_trainer{
   string get_out_dir()const{return tmva_out_dir;}
   pair<TH1D*,TH1D*> get_bdt_dists()const{return start;}
   pair<TH1D*,TH1D*> make_testing_bdt_dists(int bg=-1,int trans_DF=0,bool split=false)const;
-  pair<double,double> print_test_bdts(TCanvas *c,const TString&pdir,int bg=-1,int trans_F=0,bool split=true){return print_bdt_plots(c,make_testing_bdt_dists(bg,trans_F,split),pdir,"test-"+identifier+sam_tag(bg),sam_label(bg)+" "+region_label(),false);}//bdt_validate((bdt_trainer)*this).val_sig(bg,trans_F).first);}
+  pair<double,double> print_test_bdts(TCanvas *c,const TString&pdir,int bg=-1,int trans_F=0,bool split=true,const string&extra=""){return print_bdt_plots(c,make_testing_bdt_dists(bg,trans_F,split),pdir,"test-"+identifier+sam_tag(bg)+extra,sam_label(bg)+" "+region_label(),false);}//bdt_validate((bdt_trainer)*this).val_sig(bg,trans_F).first);}
   
  protected:
   bool passes_cut(const map<TString,pair<float,TBranch*> >& vars,int ev,int nj)const;
